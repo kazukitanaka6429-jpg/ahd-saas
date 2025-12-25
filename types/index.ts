@@ -1,0 +1,91 @@
+export type Facility = {
+    id: string
+    name: string
+    code: string
+    settings: Record<string, any>
+    created_at: string
+    updated_at: string
+}
+
+export type Staff = {
+    id: string
+    facility_id: string
+    auth_user_id: string | null
+    name: string
+    role: 'admin' | 'manager' | 'staff'
+    status: 'active' | 'retired'
+    join_date: string | null
+    leave_date: string | null
+    job_types: string[] | null
+    qualifications: string | null
+    created_at: string
+    updated_at: string
+}
+
+export type Resident = {
+    id: string
+    facility_id: string
+    name: string
+    care_level: string | null
+    status: 'in_facility' | 'hospitalized' | 'home_stay'
+    start_date: string
+    direct_debit_start_date: string | null
+    primary_insurance: string | null
+    limit_application_class: string | null
+    public_expense_1: string | null
+    public_expense_2: string | null
+    table_7: boolean
+    table_8: boolean
+    ventilator: boolean
+    classification: string | null
+    severe_disability_addition: boolean
+    sputum_suction: boolean
+    created_at: string
+    updated_at: string
+}
+
+export type FeedbackComment = {
+    id: string
+    report_date: string
+    facility_id: string
+    content: string
+    author_name: string
+    is_resolved: boolean
+    created_at: string
+}
+
+export type DailyShift = {
+    id: string
+    facility_id: string
+    date: string
+    day_staff_ids: string[]
+    evening_staff_ids: string[]
+    night_staff_ids: string[]
+    night_shift_plus: boolean
+    created_at: string
+    updated_at: string
+    updated_at: string
+}
+
+export type ReportEntry = {
+    id: string
+    facility_id: string
+    date: string
+    resident_id: string
+    measurement_time: string | null
+    blood_pressure_systolic: number | null
+    blood_pressure_diastolic: number | null
+    pulse: number | null
+    temperature: number | null
+    meal_morning: number | null
+    meal_lunch: number | null
+    meal_dinner: number | null
+    medication_morning: string | null
+    medication_lunch: string | null
+    medication_dinner: string | null
+    bath_type: string | null
+    bowel_movement_count: string | null
+    urination_count: string | null
+    created_at: string
+    updated_at: string
+}
