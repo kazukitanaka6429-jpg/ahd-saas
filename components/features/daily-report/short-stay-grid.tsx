@@ -1,6 +1,6 @@
 'use client'
 
-import { Resident, ReportEntry } from '@/types'
+import { Resident, ShortStayRecord } from '@/types'
 import {
     Table,
     TableBody,
@@ -10,95 +10,184 @@ import {
     TableRow,
 } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select'
 import { useState, useEffect } from 'react'
-import { saveReportEntry } from '@/app/(dashboard)/daily-reports/actions'
+import { saveShortStayRecord, deleteShortStayRecord } from '@/app/actions/short-stay'
 import { toast } from 'sonner'
-import { Checkbox } from '@/components/ui/checkbox'
+import { Button } from '@/components/ui/button'
+import { Loader2, Save, Trash2, AlertCircle } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 interface ShortStayGridProps {
-    residents: Resident[] // All available residents (including potential short stay)
+    residents: Resident[]
+    record: ShortStayRecord | null
     date: string
 }
 
-export function ShortStayGrid({ residents, date }: ShortStayGridProps) {
-    // 4 slots for Short Stay
-    const [slots, setSlots] = useState<Array<{ residentId: string | null }>>([
-        { residentId: null },
-        { residentId: null },
-        { residentId: null },
-        { residentId: null },
-    ])
+export function ShortStayGrid({ residents, record, date }: ShortStayGridProps) {
+    const [formData, setFormData] = useState<Partial<ShortStayRecord>>({
+        date: date,
+        meal_breakfast: false,
+        meal_lunch: false,
+        meal_dinner: false,
+        is_gh: false,
+        is_gh_night: false,
+        meal_provided_lunch: false,
+        ...record
+    })
 
-    // Load saved short stay usage?
-    // In a real app, we should fetch report_entires for 'short_stay' residents on this date.
-    // However, current schema doesn't distinguish "Short Stay Usage" explicitly unless we check 'status' of resident or specific flag.
-    // For now, let's keep it simple: UI allows selecting ANY resident (or filtering for short stay status).
-    // And if data exists for them on this date, show it.
+    const [isSaving, setIsSaving] = useState(false)
+    const [hasChanges, setHasChanges] = useState(false)
 
-    // BUT, the requirement says "4 fixed rows". 
-    // This implies we need to store "Who is in Slot 1?" somewhere, OR just query ALL report_entries for this date
-    // and filter out those who are "in_facility" (regular). The rest are likely short stay.
+    useEffect(() => {
+        setFormData({
+            date: date,
+            meal_breakfast: false,
+            meal_lunch: false,
+            meal_dinner: false,
+            is_gh: false,
+            is_gh_night: false,
+            meal_provided_lunch: false,
+            ...record
+        })
+        setHasChanges(false)
+    }, [record, date])
 
-    // For this prototype, we'll initialize slots with residents who have entries but are NOT in the main list,
-    // plus empty slots up to 4.
+    const handleChange = (key: keyof ShortStayRecord, value: any) => {
+        setFormData(prev => ({ ...prev, [key]: value }))
+        setHasChanges(true)
+    }
 
-    // This logic requires fetching entries first, which we assume are passed or we fetch client side?
-    // Let's implement basic inputs first.
+    const onSave = async () => {
+        // Validation
+        if (!formData.resident_id) {
+            toast.error('利用者が選択されていません')
+            return
+        }
+        if (!formData.daytime_activity) {
+            // Check required? User said "Required"
+        }
 
-    // Helper to handle saving
-    const handleSave = async (residentId: string, column: string, value: any) => {
-        if (!residentId) return
-        try {
-            await saveReportEntry(date, residentId, column, value)
-            // success, silent update
-        } catch (error) {
-            toast.error('保存に失敗しました')
+        setIsSaving(true)
+        const result = await saveShortStayRecord(formData)
+        setIsSaving(false)
+
+        if (result.error) {
+            toast.error(`保存に失敗しました: ${result.error}`)
+        } else {
+            toast.success('保存しました')
+            setHasChanges(false)
+        }
+    }
+
+    const onDelete = async () => {
+        if (!formData.id) return
+        if (!confirm('このレコードを削除しますか？')) return
+
+        setIsSaving(true)
+        const result = await deleteShortStayRecord(formData.id)
+        setIsSaving(false)
+
+        if (result.error) {
+            toast.error(`削除に失敗しました: ${result.error}`)
+        } else {
+            toast.success('削除しました')
+            setFormData({ date: date }) // Reset
         }
     }
 
     return (
-        <div className="rounded-md border bg-white overflow-hidden shadow-sm">
-            <div className="bg-gray-100 px-4 py-2 border-b flex justify-between items-center">
-                <h3 className="font-bold text-gray-700">■ ショートステイ利用（最大4名）</h3>
+        <div className="rounded-md border bg-white overflow-hidden shadow-sm mt-8">
+            <div className="bg-white px-4 py-2 border-b flex justify-between items-center border-[3px] border-l-transparent border-r-transparent border-t-transparent border-b-black">
+                <div className="flex items-center gap-4">
+                    <h3 className="font-bold text-lg">■ショートステイ利用</h3>
+                    <span className="text-xs text-red-500 font-bold">※同日のショート利用は1人まで</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    {formData.id && (
+                        <Button
+                            variant="destructive"
+                            onClick={onDelete}
+                            disabled={isSaving}
+                            className="h-8 w-8 p-0"
+                            title="削除"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </Button>
+                    )}
+                    <Button
+                        onClick={onSave}
+                        disabled={isSaving || !hasChanges}
+                        className="h-8 bg-green-600 hover:bg-green-700 text-white font-bold"
+                    >
+                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                        保存
+                    </Button>
+                </div>
             </div>
+
             <div className="overflow-x-auto">
-                <Table className="min-w-[1200px]">
-                    <TableHeader className="bg-gray-50">
-                        <TableRow>
-                            <TableHead className="w-[180px] min-w-[180px] sticky left-0 bg-gray-50 z-10 font-bold text-gray-700">利用者名</TableHead>
-                            <TableHead className="w-[80px] text-center">測定時間</TableHead>
-                            <TableHead className="w-[120px] text-center">血圧(上/下)</TableHead>
-                            <TableHead className="w-[60px] text-center">脈拍</TableHead>
-                            <TableHead className="w-[60px] text-center">体温</TableHead>
-                            <TableHead className="w-[150px] text-center">食事(朝/昼/夕)</TableHead>
-                            <TableHead className="w-[180px] text-center">服薬(朝/昼/夕)</TableHead>
-                            <TableHead className="w-[100px] text-center">入浴</TableHead>
-                            <TableHead className="w-[80px] text-center">排便</TableHead>
-                            <TableHead className="w-[80px] text-center">排尿</TableHead>
+                <Table className="min-w-[1000px] border-collapse border border-black">
+                    <TableHeader>
+                        <TableRow className="bg-white hover:bg-white text-black">
+                            <TableHead className="w-[120px] border border-black text-black font-bold h-auto py-1" rowSpan={2}>
+                                <div className="flex flex-col h-full justify-between text-xs">
+                                    <span>利用者No</span>
+                                    <span>利用期間</span>
+                                </div>
+                            </TableHead>
+                            <TableHead className="w-[140px] border border-black text-black font-bold text-center h-auto py-1 p-0" colSpan={3}>
+                                <div className="flex flex-col border-b border-black bg-white">
+                                    <span className="py-0.5">食事</span>
+                                    <span className="text-red-500 text-[10px] py-0.5 border-t border-black bg-white">バランス弁当提供</span>
+                                </div>
+                                <div className="grid grid-cols-3 divide-x divide-black bg-white">
+                                    <span className="py-1">朝</span>
+                                    <span className="py-1">昼</span>
+                                    <span className="py-1">夜</span>
+                                </div>
+                            </TableHead>
+                            <TableHead className="border border-black text-black font-bold text-center h-auto py-1 p-0" colSpan={2}>
+                                <div className="border-b border-black py-0.5 bg-white">
+                                    日中の活動 <span className="text-red-500">(☑必須)</span>
+                                </div>
+                                <div className="grid grid-cols-[50px_1fr] divide-x divide-black bg-white">
+                                    <span className="py-1">GH</span>
+                                    <span className="py-1">その他福祉サービス利用</span>
+                                </div>
+                            </TableHead>
+                            <TableHead className="w-[50px] border border-black text-black font-bold text-center h-auto py-1 p-0" rowSpan={1}>
+                                <div className="border-b border-black text-[10px] leading-tight py-1 bg-white">
+                                    夜間<br /><span className="text-red-500">(☑必須)</span>
+                                </div>
+                                <div className="py-1 bg-white">GH泊</div>
+                            </TableHead>
+                            <TableHead className="border border-black text-black font-bold text-center h-auto py-1 p-0" colSpan={2}>
+                                <div className="border-b border-black py-0.5 bg-white">
+                                    入退去時間 <span className="text-red-500">(必須)</span>
+                                </div>
+                                <div className="grid grid-cols-2 divide-x divide-black bg-white">
+                                    <span className="py-1 text-xs">入居時刻</span>
+                                    <span className="py-1 text-xs">退居時刻</span>
+                                </div>
+                            </TableHead>
+                            <TableHead className="w-[60px] border border-black text-black font-bold text-center h-auto py-1 text-[10px] leading-tight" rowSpan={2}>
+                                食事提供有<br />(経営含む)
+                                <div className="border-t border-black mt-1 py-1">昼食</div>
+                            </TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {/* 4 Fixed Rows */}
-                        {slots.map((slot, index) => (
-                            <TableRow key={index} className="hover:bg-gray-50/50">
-                                <TableCell className="sticky left-0 bg-white z-10 p-2 border-r">
+                        <TableRow className="hover:bg-gray-50/50 border-b border-black h-[60px]">
+                            {/* Resident / Period */}
+                            <TableCell className="border border-black p-1 align-top bg-white">
+                                <div className="flex flex-col gap-1">
+                                    {/* Resident Select */}
                                     <Select
-                                        onValueChange={(val) => {
-                                            const newSlots = [...slots]
-                                            newSlots[index].residentId = val
-                                            setSlots(newSlots)
-                                        }}
-                                        value={slot.residentId || ''}
+                                        value={formData.resident_id || ""}
+                                        onValueChange={(val) => handleChange('resident_id', val)}
                                     >
-                                        <SelectTrigger className="w-full h-8">
-                                            <SelectValue placeholder="利用者を選択" />
+                                        <SelectTrigger className="w-full h-7 text-xs border-gray-300">
+                                            <SelectValue placeholder="選択..." />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {residents.map(r => (
@@ -106,87 +195,113 @@ export function ShortStayGrid({ residents, date }: ShortStayGridProps) {
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                </TableCell>
 
-                                {/* Only show inputs if resident selected */}
-                                {slot.residentId ? (
-                                    <>
-                                        <TableCell className="p-1 text-center">
-                                            <Input type="time" className="h-8 w-20 mx-auto"
-                                                onChange={(e) => handleSave(slot.residentId!, 'measurement_time', e.target.value)}
-                                            />
-                                        </TableCell>
-                                        <TableCell className="p-1">
-                                            <div className="flex items-center justify-center gap-1">
-                                                <Input type="number" className="h-8 w-12 text-center" placeholder="上"
-                                                    onChange={(e) => handleSave(slot.residentId!, 'blood_pressure_systolic', e.target.value)}
-                                                />
-                                                <span className="text-gray-400">/</span>
-                                                <Input type="number" className="h-8 w-12 text-center" placeholder="下"
-                                                    onChange={(e) => handleSave(slot.residentId!, 'blood_pressure_diastolic', e.target.value)}
-                                                />
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="p-1 text-center">
-                                            <Input type="number" className="h-8 w-14 mx-auto"
-                                                onChange={(e) => handleSave(slot.residentId!, 'pulse', e.target.value)}
-                                            />
-                                        </TableCell>
-                                        <TableCell className="p-1 text-center">
-                                            <Input type="number" step="0.1" className="h-8 w-14 mx-auto"
-                                                onChange={(e) => handleSave(slot.residentId!, 'temperature', e.target.value)}
-                                            />
-                                        </TableCell>
-                                        <TableCell className="p-1">
-                                            <div className="flex items-center justify-center gap-1">
-                                                <Input type="number" max={10} className="h-8 w-10 text-center px-1" placeholder="朝"
-                                                    onChange={(e) => handleSave(slot.residentId!, 'meal_morning', e.target.value)}
-                                                />
-                                                <Input type="number" max={10} className="h-8 w-10 text-center px-1" placeholder="昼"
-                                                    onChange={(e) => handleSave(slot.residentId!, 'meal_lunch', e.target.value)}
-                                                />
-                                                <Input type="number" max={10} className="h-8 w-10 text-center px-1" placeholder="夕"
-                                                    onChange={(e) => handleSave(slot.residentId!, 'meal_dinner', e.target.value)}
-                                                />
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="p-1">
-                                            <div className="flex items-center justify-center gap-2">
-                                                <Checkbox onCheckedChange={(c) => handleSave(slot.residentId!, 'medication_morning', c ? 'avail' : null)} />
-                                                <Checkbox onCheckedChange={(c) => handleSave(slot.residentId!, 'medication_lunch', c ? 'avail' : null)} />
-                                                <Checkbox onCheckedChange={(c) => handleSave(slot.residentId!, 'medication_dinner', c ? 'avail' : null)} />
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="p-1 text-center">
-                                            <Select onValueChange={(val) => handleSave(slot.residentId!, 'bath_type', val)}>
-                                                <SelectTrigger className="h-8 w-24 mx-auto"><SelectValue /></SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="none">-</SelectItem>
-                                                    <SelectItem value="general">一般浴</SelectItem>
-                                                    <SelectItem value="special">機械浴</SelectItem>
-                                                    <SelectItem value="shower">シャワー</SelectItem>
-                                                    <SelectItem value="wipe">清拭</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </TableCell>
-                                        <TableCell className="p-1 text-center">
-                                            <Input className="h-8 w-16 mx-auto"
-                                                onChange={(e) => handleSave(slot.residentId!, 'bowel_movement_count', e.target.value)}
-                                            />
-                                        </TableCell>
-                                        <TableCell className="p-1 text-center">
-                                            <Input className="h-8 w-16 mx-auto"
-                                                onChange={(e) => handleSave(slot.residentId!, 'urination_count', e.target.value)}
-                                            />
-                                        </TableCell>
-                                    </>
-                                ) : (
-                                    <TableCell colSpan={9} className="text-center text-gray-400 text-sm py-2">
-                                        利用者を選択してください
-                                    </TableCell>
-                                )}
-                            </TableRow>
-                        ))}
+                                    {/* Period Note */}
+                                    <Input
+                                        className="h-6 text-xs px-1"
+                                        placeholder="1/1~1/3"
+                                        value={formData.period_note || ''}
+                                        onChange={(e) => handleChange('period_note', e.target.value)}
+                                    />
+                                </div>
+                            </TableCell>
+
+                            {/* Meals */}
+                            <TableCell className="border border-black p-0 text-center align-middle bg-[#d9ead3]">
+                                <div className="flex justify-center items-center h-full py-2">
+                                    <input type="checkbox" className="w-5 h-5 accent-green-600 cursor-pointer"
+                                        checked={formData.meal_breakfast || false}
+                                        onChange={(e) => handleChange('meal_breakfast', e.target.checked)}
+                                    />
+                                </div>
+                            </TableCell>
+                            <TableCell className="border border-black p-0 text-center align-middle bg-[#d9ead3]">
+                                <div className="flex justify-center items-center h-full py-2">
+                                    <input type="checkbox" className="w-5 h-5 accent-green-600 cursor-pointer"
+                                        checked={formData.meal_lunch || false}
+                                        onChange={(e) => handleChange('meal_lunch', e.target.checked)}
+                                    />
+                                </div>
+                            </TableCell>
+                            <TableCell className="border border-black p-0 text-center align-middle bg-[#d9ead3]">
+                                <div className="flex justify-center items-center h-full py-2">
+                                    <input type="checkbox" className="w-5 h-5 accent-green-600 cursor-pointer"
+                                        checked={formData.meal_dinner || false}
+                                        onChange={(e) => handleChange('meal_dinner', e.target.checked)}
+                                    />
+                                </div>
+                            </TableCell>
+
+                            {/* GH */}
+                            <TableCell className="border border-black p-0 text-center align-middle bg-[#d9ead3]">
+                                <div className="flex justify-center items-center h-full py-2">
+                                    <input type="checkbox" className="w-5 h-5 accent-green-600 cursor-pointer"
+                                        checked={formData.is_gh || false}
+                                        onChange={(e) => handleChange('is_gh', e.target.checked)}
+                                    />
+                                </div>
+                            </TableCell>
+
+                            {/* Activities */}
+                            <TableCell className="border border-black p-0 bg-[#d9ead3] align-middle">
+                                <div className="px-1 py-1 h-full">
+                                    <Input
+                                        className={`h-full min-h-[40px] w-full text-xs bg-white border-0 ${!formData.daytime_activity ? 'border border-red-200' : ''}`}
+                                        placeholder="必須"
+                                        value={formData.daytime_activity || ''}
+                                        onChange={(e) => handleChange('daytime_activity', e.target.value)}
+                                    />
+                                    {/* OR Select if needed */}
+                                    <Select
+                                        value={formData.other_welfare_service || ""}
+                                        onValueChange={(val) => handleChange('other_welfare_service', val)}
+                                    >
+                                        <SelectTrigger className="w-full h-7 text-xs border-0 bg-transparent mt-1 p-0">
+                                            <SelectValue placeholder="その他サービス..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="day_service">デイサービス</SelectItem>
+                                            <SelectItem value="visit_nursing">訪問看護</SelectItem>
+                                            <SelectItem value="none">なし</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </TableCell>
+
+                            {/* Night GH */}
+                            <TableCell className="border border-black p-0 text-center align-middle bg-[#d9ead3]">
+                                <div className="flex justify-center items-center h-full py-2">
+                                    <input type="checkbox" className="w-5 h-5 accent-green-600 cursor-pointer"
+                                        checked={formData.is_gh_night || false}
+                                        onChange={(e) => handleChange('is_gh_night', e.target.checked)}
+                                    />
+                                </div>
+                            </TableCell>
+
+                            {/* Time */}
+                            <TableCell className="border border-black p-0 text-center align-middle bg-[#d9ead3]">
+                                <Input type="time" className="h-full border-0 bg-transparent text-center"
+                                    value={formData.entry_time || ''}
+                                    onChange={(e) => handleChange('entry_time', e.target.value)}
+                                />
+                            </TableCell>
+                            <TableCell className="border border-black p-0 text-center align-middle">
+                                <Input type="time" className="h-full border-0 bg-transparent text-center"
+                                    value={formData.exit_time || ''}
+                                    onChange={(e) => handleChange('exit_time', e.target.value)}
+                                />
+                            </TableCell>
+
+                            {/* Meal Provided */}
+                            <TableCell className="border border-black p-0 text-center align-middle bg-[#d9ead3]">
+                                <div className="flex justify-center items-center h-full py-2">
+                                    <input type="checkbox" className="w-5 h-5 accent-green-600 cursor-pointer"
+                                        checked={formData.meal_provided_lunch || false}
+                                        onChange={(e) => handleChange('meal_provided_lunch', e.target.checked)}
+                                    />
+                                </div>
+                            </TableCell>
+                        </TableRow>
                     </TableBody>
                 </Table>
             </div>

@@ -10,7 +10,8 @@ import {
     UserCircle,
     FileSpreadsheet,
     BarChart3,
-    LogOut
+    LogOut,
+    Stethoscope
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
@@ -47,6 +48,11 @@ const sidebarItems = [
         href: '/analysis',
         icon: BarChart3,
     },
+    {
+        title: '医療連携IV',
+        href: '/medical-cooperation',
+        icon: Stethoscope,
+    },
 ]
 
 // Role definitions (duplicated from auth-helpers to avoid server import in client)
@@ -70,7 +76,7 @@ export function Sidebar({ role }: { role?: string }) {
     const filteredItems = sidebarItems.filter(item => {
         // Staff cannot access management pages
         if (role === ROLES.STAFF) {
-            return !['/facilities', '/staffs', '/residents', '/analysis'].includes(item.href)
+            return !['/facilities', '/staffs', '/residents', '/analysis', '/medical-cooperation'].includes(item.href)
         }
         // Manager cannot access facilities master (assuming only HQ manages facilities creation?)
         // OR adhering to user request "Manager can use all functions of their facility"

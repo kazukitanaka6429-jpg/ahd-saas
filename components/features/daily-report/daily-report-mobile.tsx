@@ -1,6 +1,6 @@
 'use client'
 
-import { Resident, ReportEntry } from '@/types'
+import { Resident, DailyRecord } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -12,7 +12,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { Badge } from '@/components/ui/badge'
-import { saveReportEntry } from '@/app/(dashboard)/daily-reports/actions'
+import { upsertDailyRecordsBulk } from '@/app/(dashboard)/daily-reports/actions'
 import { toast } from "sonner"
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -37,19 +37,19 @@ export function DailyReportMobileList({
     residents: Resident[]
     date: string
 }) {
-    const [entries, setEntries] = useState<Record<string, ReportEntry>>({})
+    const [entries, setEntries] = useState<Record<string, Record<string, any>>>({})
 
     useEffect(() => {
         const fetchEntries = async () => {
             const supabase = createClient()
             const { data } = await supabase
-                .from('report_entries')
+                .from('daily_records')
                 .select('*')
                 .eq('date', date)
 
-            const entryMap: Record<string, ReportEntry> = {}
-            data?.forEach((entry: ReportEntry) => {
-                entryMap[entry.resident_id] = entry
+            const entryMap: Record<string, Record<string, any>> = {}
+            data?.forEach((record: DailyRecord) => {
+                entryMap[record.resident_id] = record.data || {}
             })
             setEntries(entryMap)
         }
@@ -58,18 +58,24 @@ export function DailyReportMobileList({
 
     const handleSave = async (residentId: string, column: string, value: any) => {
         // Optimistic Update
-        setEntries(prev => ({
-            ...prev,
-            [residentId]: {
-                ...prev[residentId],
-                resident_id: residentId,
-                [column]: value
-            } as ReportEntry
-        }))
+        setEntries(prev => {
+            const currentData = prev[residentId] || {}
+            return {
+                ...prev,
+                [residentId]: {
+                    ...currentData,
+                    [column]: value
+                }
+            }
+        })
 
         // Server Action
         try {
-            await saveReportEntry(date, residentId, column, value)
+            await upsertDailyRecordsBulk([{
+                resident_id: residentId,
+                date: date,
+                data: { [column]: value }
+            }])
         } catch (error) {
             toast.error('保存に失敗しました')
             // Revert state if needed (skipped for simplicity in MVP)
@@ -79,7 +85,7 @@ export function DailyReportMobileList({
     return (
         <div className="space-y-4">
             {residents.map((resident) => {
-                const entry = entries[resident.resident_id || resident.id] || {}
+                const entry = entries[resident.id] || {}
                 return (
                     <ResidentMobileCard
                         key={resident.id}
@@ -132,7 +138,7 @@ function ResidentMobileCard({ resident, entry, onSave }: any) {
                                 <div>
                                     <label className="text-xs block mb-1">時間</label>
                                     <Select
-                                        defaultValue={entry.measurement_time}
+                                        value={entry.measurement_time}
                                         onValueChange={(val) => onSave(resident.id, 'measurement_time', val)}
                                     >
                                         <SelectTrigger className="h-8 text-xs">

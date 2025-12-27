@@ -153,7 +153,7 @@ export function CreateStaffDialog() {
                         </div>
 
                         <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="qualifications" className="text-right">资格</Label>
+                            <Label htmlFor="qualifications" className="text-right">資格</Label>
                             <Select name="qualifications">
                                 <SelectTrigger className="col-span-3">
                                     <SelectValue placeholder="資格を選択" />

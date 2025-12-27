@@ -1,10 +1,10 @@
 'use client'
 
 import * as React from "react"
-import { format } from "date-fns"
+import { format, addDays, subDays, parseISO } from "date-fns"
 import { ja } from "date-fns/locale"
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname, useSearchParams } from "next/navigation"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -17,35 +17,41 @@ import {
 
 export function DateSelector({ date }: { date: string }) {
     const router = useRouter()
+    const pathname = usePathname()
+    const searchParams = useSearchParams()
     const [open, setOpen] = React.useState(false)
-    const currentDate = new Date(date)
+
+    // Ensure we parse the YYYY-MM-DD string as specific date, avoiding timezone shifts
+    // But basic new Date(date) usually defaults to UTC 00:00 for ISO date-only strings?
+    // Actually new Date('2023-01-01') is UTC. format(d) uses local. This causes shift.
+    // parseISO is safer.
+    const currentDate = parseISO(date)
+
+    const updateDate = (newDate: Date) => {
+        const dateString = format(newDate, 'yyyy-MM-dd')
+        const params = new URLSearchParams(searchParams.toString())
+        params.set('date', dateString)
+
+        // Use replace instead of push for smoother UX if just scanning days? 
+        // Or push is fine. Let's stick to push but remove refresh.
+        router.push(`${pathname}?${params.toString()}`)
+        router.refresh()
+    }
 
     const handleDateSelect = (newDate: Date | undefined) => {
         if (!newDate) return
-
-        // Adjust for timezone offset to avoid previous day selection issue
-        // Or simply use format which uses local time
-        const dateString = format(newDate, 'yyyy-MM-dd')
-
-        router.push(`?date=${dateString}`)
-        router.refresh()
+        updateDate(newDate)
         setOpen(false)
     }
 
     const handlePrevDay = () => {
-        const d = new Date(date)
-        d.setDate(d.getDate() - 1)
-        const newDate = format(d, 'yyyy-MM-dd')
-        router.push(`?date=${newDate}`)
-        router.refresh()
+        const prev = subDays(currentDate, 1)
+        updateDate(prev)
     }
 
     const handleNextDay = () => {
-        const d = new Date(date)
-        d.setDate(d.getDate() + 1)
-        const newDate = format(d, 'yyyy-MM-dd')
-        router.push(`?date=${newDate}`)
-        router.refresh()
+        const next = addDays(currentDate, 1)
+        updateDate(next)
     }
 
     return (
@@ -58,6 +64,7 @@ export function DateSelector({ date }: { date: string }) {
                 <PopoverTrigger asChild>
                     <Button
                         variant={"outline"}
+                        suppressHydrationWarning
                         className={cn(
                             "w-[240px] justify-start text-left font-normal",
                             !date && "text-muted-foreground"

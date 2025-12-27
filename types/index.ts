@@ -54,6 +54,38 @@ export type FeedbackComment = {
     created_at: string
 }
 
+export type FindingComment = {
+    id: string
+
+    daily_record_id?: string
+    medical_record_id?: string
+    json_path: string | null
+    content: string
+    author_name: string
+    is_resolved: boolean
+    created_at: string
+}
+
+export type ShortStayRecord = {
+    id: string
+    facility_id: string
+    date: string
+    resident_id: string | null
+    period_note: string | null
+    meal_breakfast: boolean
+    meal_lunch: boolean
+    meal_dinner: boolean
+    is_gh: boolean
+    is_gh_night: boolean
+    meal_provided_lunch: boolean
+    daytime_activity: string | null
+    other_welfare_service: string | null
+    entry_time: string | null
+    exit_time: string | null
+    created_at: string
+    updated_at: string
+}
+
 export type DailyShift = {
     id: string
     facility_id: string
@@ -63,7 +95,6 @@ export type DailyShift = {
     night_staff_ids: string[]
     night_shift_plus: boolean
     created_at: string
-    updated_at: string
     updated_at: string
 }
 
@@ -86,6 +117,28 @@ export type ReportEntry = {
     bath_type: string | null
     bowel_movement_count: string | null
     urination_count: string | null
+    created_at: string
+    updated_at: string
+}
+
+export type MedicalCooperationRecord = {
+    id: string
+    facility_id: string
+    resident_id: string
+    staff_id: string | null
+    date: string
+    created_at: string
+    updated_at: string
+}
+
+export type DailyRecord = {
+    id: string
+    facility_id: string
+    resident_id: string
+    date: string
+    hospitalization_status: boolean
+    overnight_stay_status: boolean
+    data: Record<string, any> // JSONB
     created_at: string
     updated_at: string
 }

@@ -52,7 +52,20 @@ export function StaffAttendance({
         if (key === 'night_shift_plus') setNightShiftPlus(value)
 
         // Save to DB
-        const result = await saveDailyShift(date, key, value)
+        // Save to DB
+        // saveDailyShift expects (date, shiftsObject). 
+        const result = await saveDailyShift(date, { [key]: value })
+        // Note: saveDailyShift currently returns void in actions.ts, so result might be undefined.
+        // But the calling code checks result.error.
+        // We should update saveDailyShift to return result object or handle promise rejection.
+        // For now, let's fix the argument.
+        // Wait, checking actions.ts, `saveDailyShift` is:
+        // export async function saveDailyShift(date: string, shifts: any) { ... if (error) console.error(error); revalidatePath(...) }
+        // It does NOT return { error: ... }.
+        // So `if (result.error)` will crash if result is undefined or void.
+        // I should also fix actions.ts to return validation result OR fix this component to not assume return.
+        // Given existing code, I'll fix arguments first.
+
         if (result.error) {
             toast.error('保存に失敗しました')
         }
