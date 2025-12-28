@@ -160,6 +160,14 @@ export async function upsertDailyRecordsBulk(records: {
     data: Record<string, any>
     hospitalization_status?: boolean
     overnight_stay_status?: boolean
+    meal_breakfast?: boolean
+    meal_lunch?: boolean
+    meal_dinner?: boolean
+    is_gh?: boolean
+    daytime_activity?: boolean
+    other_welfare_service?: string | null
+    is_gh_night?: boolean
+    emergency_transport?: boolean
 }[]) {
     const staff = await getCurrentStaff()
     if (!staff) throw new Error('Unauthorized')
@@ -168,27 +176,12 @@ export async function upsertDailyRecordsBulk(records: {
     const supabase = await createClient()
 
     // Processing: We need to merge JSONB data.
-    // Supabase upsert replaces the row. So we should fetch existing first or use a postgres function.
-    // However, "manual save" implies we are sending the *latest desired state* for these fields.
-    // But if we only send changed fields, we need to merge.
-    // For simplicity in Phase 2, let's assume the UI sends the *delta* and we use a JSONB merge or we fetch-merge-update.
-    // Since this is a bulk operation, doing N fetches is bad.
-    // Better strategy: The UI should probably maintain the full "data" object for that day-resident or we allow partial updates if we use a jsonb_set or deep merge function.
-    // Postgres `jsonb || jsonb` does a shallow merge.
-
     // Efficient Approach:
     // 1. Fetch existing records for the (resident, date) tuples.
     // 2. Merge in memory.
     // 3. Upsert.
 
-    // Extract keys for fetching
-    const keys = records.map(r => `${r.resident_id}_${r.date}`)
-    // Fetch existing
-    // We can't easily "IN" on composite keys in Supabase without a stored proc or iterating.
-    // Let's iterate for now or fetch by date range if all are same date (likely).
-
     // Optimization: In this app, users save for a specific DATE usually.
-    // Check if single date.
     const dates = new Set(records.map(r => r.date))
     if (dates.size === 1) {
         const date = records[0].date
@@ -212,7 +205,15 @@ export async function upsertDailyRecordsBulk(records: {
                 date: r.date,
                 data: newData,
                 hospitalization_status: r.hospitalization_status ?? existing?.hospitalization_status ?? false,
-                overnight_stay_status: r.overnight_stay_status ?? existing?.overnight_stay_status ?? false
+                overnight_stay_status: r.overnight_stay_status ?? existing?.overnight_stay_status ?? false,
+                meal_breakfast: r.meal_breakfast ?? existing?.meal_breakfast ?? false,
+                meal_lunch: r.meal_lunch ?? existing?.meal_lunch ?? false,
+                meal_dinner: r.meal_dinner ?? existing?.meal_dinner ?? false,
+                is_gh: r.is_gh ?? existing?.is_gh ?? false,
+                daytime_activity: r.daytime_activity ?? existing?.daytime_activity ?? false,
+                other_welfare_service: r.other_welfare_service ?? existing?.other_welfare_service ?? null,
+                is_gh_night: r.is_gh_night ?? existing?.is_gh_night ?? false,
+                emergency_transport: r.emergency_transport ?? existing?.emergency_transport ?? false
             }
         })
 
@@ -225,9 +226,8 @@ export async function upsertDailyRecordsBulk(records: {
             return { error: error.message }
         }
     } else {
-        // Multi-date save (rare but possible). Fallback to loop or individual upserts.
+        // Multi-date save (fallback)
         for (const r of records) {
-            // Inefficient but safe fallback
             const { data: existing } = await supabase.from('daily_records').select('*').eq('facility_id', facilityId).eq('resident_id', r.resident_id).eq('date', r.date).single()
             const newData = { ...(existing?.data || {}), ...r.data }
             await supabase.from('daily_records').upsert({
@@ -236,7 +236,15 @@ export async function upsertDailyRecordsBulk(records: {
                 date: r.date,
                 data: newData,
                 hospitalization_status: r.hospitalization_status ?? existing?.hospitalization_status ?? false,
-                overnight_stay_status: r.overnight_stay_status ?? existing?.overnight_stay_status ?? false
+                overnight_stay_status: r.overnight_stay_status ?? existing?.overnight_stay_status ?? false,
+                meal_breakfast: r.meal_breakfast ?? existing?.meal_breakfast ?? false,
+                meal_lunch: r.meal_lunch ?? existing?.meal_lunch ?? false,
+                meal_dinner: r.meal_dinner ?? existing?.meal_dinner ?? false,
+                is_gh: r.is_gh ?? existing?.is_gh ?? false,
+                daytime_activity: r.daytime_activity ?? existing?.daytime_activity ?? false,
+                other_welfare_service: r.other_welfare_service ?? existing?.other_welfare_service ?? null,
+                is_gh_night: r.is_gh_night ?? existing?.is_gh_night ?? false,
+                emergency_transport: r.emergency_transport ?? existing?.emergency_transport ?? false
             }, { onConflict: 'resident_id, date' })
         }
     }

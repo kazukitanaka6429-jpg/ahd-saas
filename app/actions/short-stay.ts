@@ -50,9 +50,11 @@ export async function saveShortStayRecord(data: Partial<ShortStayRecord>) {
     // But if we insert and a record exists (race condition or client didn't have ID), upsert on constraint?
     // Supabase .upsert() can handle conflict on unique columns.
 
-    const { error } = await supabase
+    const { data: savedRecord, error } = await supabase
         .from('short_stay_records')
         .upsert(record, { onConflict: 'facility_id, date' })
+        .select()
+        .single()
 
     if (error) {
         console.error('Error saving short stay record:', error)
@@ -60,7 +62,7 @@ export async function saveShortStayRecord(data: Partial<ShortStayRecord>) {
     }
 
     revalidatePath('/daily-reports')
-    return { success: true }
+    return { success: true, data: savedRecord }
 }
 
 export async function deleteShortStayRecord(id: string) {

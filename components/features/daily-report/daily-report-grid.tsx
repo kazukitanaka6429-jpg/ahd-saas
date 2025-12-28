@@ -9,13 +9,14 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table'
-import { Input } from '@/components/ui/input'
 import { useState, useEffect } from 'react'
 import { upsertDailyRecordsBulk } from '@/app/(dashboard)/daily-reports/actions'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Loader2, Save } from 'lucide-react'
 import { FindingSheet } from './finding-sheet'
+import { useGlobalSave } from '@/components/providers/global-save-context'
+import { cn } from '@/lib/utils'
 
 interface DailyReportGridProps {
     residents: Resident[]
@@ -25,24 +26,18 @@ interface DailyReportGridProps {
 }
 
 export function DailyReportGrid({ residents, defaultRecords, date, findingsIndicators = {} }: DailyReportGridProps) {
+    const { registerSaveNode, unregisterSaveNode, triggerGlobalSave, isSaving: isGlobalSaving } = useGlobalSave()
+
     // Optimistic UI State
-    const [localData, setLocalData] = useState<Map<string, Record<string, any>>>(() => {
+    const [localData, setLocalData] = useState<Map<string, DailyRecord>>(() => {
         const map = new Map()
         defaultRecords.forEach(r => {
-            map.set(r.resident_id, r.data || {})
+            map.set(r.resident_id, r)
         })
         return map
     })
 
-    // Map resident_id to daily_record_id for findings lookup
-    const [recordIds, setRecordIds] = useState<Map<string, string>>(() => {
-        const map = new Map()
-        defaultRecords.forEach(r => map.set(r.resident_id, r.id))
-        return map
-    })
-
-    const [pendingChanges, setPendingChanges] = useState<Map<string, Record<string, any>>>(new Map())
-    const [isSaving, setIsSaving] = useState(false)
+    const [pendingChanges, setPendingChanges] = useState<Map<string, Partial<DailyRecord>>>(new Map())
 
     // Findings State
     const [findingState, setFindingState] = useState<{
@@ -54,26 +49,48 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
 
     useEffect(() => {
         const map = new Map()
-        const idMap = new Map()
         defaultRecords.forEach(r => {
-            map.set(r.resident_id, r.data || {})
-            idMap.set(r.resident_id, r.id)
+            map.set(r.resident_id, r)
         })
         setLocalData(map)
-        setRecordIds(idMap)
         setPendingChanges(new Map())
     }, [defaultRecords])
 
-    const getValue = (residentId: string, key: string) => {
-        const data = localData.get(residentId)
-        if (!data) return ''
-        return data[key] !== undefined && data[key] !== null ? String(data[key]) : ''
+    // Register Save Function
+    useEffect(() => {
+        const id = 'daily-report-grid'
+        registerSaveNode(id, async () => {
+            if (pendingChanges.size === 0) return
+
+            const recordsToSave = Array.from(pendingChanges.entries()).map(([residentId, changes]) => ({
+                resident_id: residentId,
+                date: date,
+                data: {}, // Not using data for these fields anymore, but keeping for compatibility if mixed
+                ...changes
+            }))
+
+            const result = await upsertDailyRecordsBulk(recordsToSave)
+            if (result.error) {
+                console.error("Daily report save failed", result.error)
+                throw new Error(result.error)
+            }
+            if (result.success) {
+                setPendingChanges(new Map())
+            }
+        })
+        return () => unregisterSaveNode(id)
+    }, [registerSaveNode, unregisterSaveNode, pendingChanges, date])
+
+    const getValue = (residentId: string, key: keyof DailyRecord) => {
+        const record = localData.get(residentId)
+        if (!record) return undefined
+        return record[key]
     }
 
-    const handleSave = (residentId: string, column: string, value: any) => {
+    const handleSave = (residentId: string, column: keyof DailyRecord, value: any) => {
         setLocalData(prev => {
             const newMap = new Map(prev)
-            const current = newMap.get(residentId) || {}
+            const current = newMap.get(residentId) || { resident_id: residentId } as DailyRecord
             newMap.set(residentId, { ...current, [column]: value })
             return newMap
         })
@@ -86,78 +103,44 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
         })
     }
 
-    const onSave = async () => {
-        if (pendingChanges.size === 0) {
-            toast.info('変更はありません')
-            return
-        }
-
-        setIsSaving(true)
-        try {
-            const recordsToSave = Array.from(pendingChanges.entries()).map(([residentId, changes]) => ({
-                resident_id: residentId,
-                date: date,
-                data: changes
-            }))
-
-            const result = await upsertDailyRecordsBulk(recordsToSave)
-
-            if (result.error) {
-                toast.error(`保存に失敗しました: ${result.error}`)
-            } else {
-                toast.success('保存しました')
-                setPendingChanges(new Map())
-            }
-        } catch (e: any) {
-            toast.error(`エラーが発生しました: ${e.message || 'Unknown error'}`)
-        } finally {
-            setIsSaving(false)
-        }
+    const onManualSave = async () => {
+        await triggerGlobalSave()
     }
 
-    // Context Menu Handler
-    const handleContextMenu = (e: React.MouseEvent, resident: Resident, key: string, label: string) => {
-        e.preventDefault() // Block default browser menu
-        const recordId = recordIds.get(resident.id)
-
-        if (!recordId) {
+    const handleContextMenu = (e: React.MouseEvent, residentId: string, key: string, label: string) => {
+        e.preventDefault()
+        const record = localData.get(residentId)
+        if (!record?.id) {
             toast.warning('まずはデータを保存してください（ID未発行のため指摘を追加できません）')
             return
         }
-
         setFindingState({
             isOpen: true,
-            recordId,
+            recordId: record.id,
             jsonPath: key,
-            label: `${resident.name} - ${label}`
+            label: `業務日誌 - ${label}`
         })
     }
 
-    // Indicator Helper
     const hasFinding = (residentId: string, key: string) => {
-        // findingIndicators uses dailyRecordId
-        const recordId = recordIds.get(residentId)
-        if (!recordId) return false
-        const paths = findingsIndicators[recordId]
-        return paths && paths.includes(key)
+        const record = localData.get(residentId)
+        if (!record?.id) return false
+        return findingsIndicators[record.id]?.includes(key)
     }
 
-    // Cell Wrapper for consistent context menu and indicator
-    const Cell = ({ resident, colKey, label, children, className = "" }: { resident: Resident, colKey: string, label: string, children: React.ReactNode, className?: string }) => {
-        const showIndicator = hasFinding(resident.id, colKey)
+    const headerClass = "border border-black bg-gray-100 text-center font-bold text-xs p-1 h-auto align-middle"
+    const cellClass = "border border-black p-0 text-center align-middle h-[40px] relative bg-white"
+    const checkboxClass = "w-5 h-5 accent-green-600 cursor-pointer"
+
+    const FindingCell = ({ residentId, colKey, children, className = "", label }: { residentId: string, colKey: string, children: React.ReactNode, className?: string, label: string }) => {
+        const show = hasFinding(residentId, colKey)
         return (
             <TableCell
-                className={`border border-black p-0 text-center relative ${className}`}
-                onContextMenu={(e) => handleContextMenu(e, resident, colKey, label)}
+                className={cn(cellClass, className)}
+                onContextMenu={(e) => handleContextMenu(e, residentId, colKey, label)}
             >
                 {children}
-                {showIndicator && (
-                    <div className="absolute top-0 right-0 w-0 h-0 border-t-[8px] border-r-[8px] border-t-red-500 border-r-transparent pointer-events-none" />
-                )}
-                {/* Alternative indicator: Red triangle in corner 
-                    border-t-red-500 border-l-transparent ...
-                 */}
-                {showIndicator && (
+                {show && (
                     <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-bl-full pointer-events-none" />
                 )}
             </TableCell>
@@ -166,167 +149,135 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
 
     return (
         <div className="rounded-md border bg-white overflow-hidden shadow-sm">
-            {/* Header with Save Button */}
             <div className="px-4 py-2 border-b flex justify-between items-center bg-gray-50 border-black border-l-0 border-r-0 border-t-0">
-                <div className="text-sm text-gray-500">
-                    ※セルを右クリックすると指摘・コメントを追加できます
+                <div className="text-sm font-bold flex items-center gap-2">
+                    <span className="w-2 h-2 bg-black mr-1"></span>
+                    日中・夜間支援（業務日誌）
                 </div>
-                <Button
-                    onClick={onSave}
-                    disabled={isSaving || pendingChanges.size === 0}
-                    className="h-8 bg-green-600 hover:bg-green-700 text-white font-bold"
-                >
-                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                    保存 ({pendingChanges.size})
+                <Button onClick={onManualSave} disabled={isGlobalSaving} className="h-8 bg-green-600 hover:bg-green-700 text-white font-bold">
+                    {isGlobalSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                    保存
                 </Button>
             </div>
 
             <div className="overflow-x-auto">
-                <Table className="min-w-[1200px] border-collapse border border-black table-fixed text-sm">
+                <Table className="min-w-[1000px] border-collapse border border-black text-sm w-full">
                     <TableHeader>
-                        <TableRow className="bg-white hover:bg-white text-black">
-                            <TableHead className="w-[140px] border border-black text-black font-bold text-center h-auto py-1 bg-gray-100" rowSpan={2}>
-                                利用者名
-                            </TableHead>
-
-                            {/* Meals (3 cols) */}
-                            <TableHead className="border border-black text-black font-bold text-center h-auto py-1 bg-gray-100 p-0" colSpan={3}>
+                        <TableRow className="h-[40px]">
+                            <TableHead className={cn(headerClass, "w-[150px]")} rowSpan={2}>ご利用者名</TableHead>
+                            <TableHead className={cn(headerClass)} colSpan={3}>
                                 <div className="border-b border-black py-1">食事</div>
-                                <div className="text-[10px] text-red-600 font-normal">バランス弁当提供</div>
+                                <div className="text-red-500 text-xs">バランス弁当提供</div>
                             </TableHead>
-
-                            {/* Day Activity (3 cols) */}
-                            <TableHead className="border border-black text-black font-bold text-center h-auto py-1 bg-gray-100 p-0" colSpan={3}>
-                                <div className="py-2">日中の活動 <span className="text-red-500 text-xs">(必須)</span></div>
+                            <TableHead className={cn(headerClass)} colSpan={3}>
+                                <div className="py-2">日中の活動 <span className="text-red-500 text-xs">(☑必須)</span></div>
                             </TableHead>
-
-                            {/* Night Activity (4 cols) */}
-                            <TableHead className="border border-black text-black font-bold text-center h-auto py-1 bg-gray-100 p-0" colSpan={4}>
-                                <div className="py-2">夜間 <span className="text-red-500 text-xs">(必須)</span></div>
+                            <TableHead className={cn(headerClass)} colSpan={4}>
+                                <div className="py-2">夜間 <span className="text-red-500 text-xs">(☑必須)</span></div>
                             </TableHead>
                         </TableRow>
-
-                        {/* Sub Header */}
-                        <TableRow className="bg-white hover:bg-white text-black">
-                            {/* Meals */}
-                            <TableHead className="w-[50px] border border-black text-black text-center h-auto py-1 text-xs bg-gray-50">朝食</TableHead>
-                            <TableHead className="w-[50px] border border-black text-black text-center h-auto py-1 text-xs bg-gray-50">昼食</TableHead>
-                            <TableHead className="w-[50px] border border-black text-black text-center h-auto py-1 text-xs bg-gray-50">夕食</TableHead>
-
-                            {/* Day Activity */}
-                            <TableHead className="w-[50px] border border-black text-black text-center h-auto py-1 text-xs bg-gray-50">GH</TableHead>
-                            <TableHead className="border border-black text-black text-center h-auto py-1 text-xs bg-gray-50">日中活動</TableHead>
-                            <TableHead className="border border-black text-black text-center h-auto py-1 text-xs bg-gray-50">その他福祉<br />サービス利用</TableHead>
-
-                            {/* Night Activity */}
-                            <TableHead className="w-[50px] border border-black text-black text-center h-auto py-1 text-xs bg-gray-50">GH泊</TableHead>
-                            <TableHead className="w-[50px] border border-black text-black text-center h-auto py-1 text-xs bg-gray-50">救急</TableHead>
-                            <TableHead className="w-[50px] border border-black text-black text-center h-auto py-1 text-xs bg-gray-50">入院</TableHead>
-                            <TableHead className="w-[50px] border border-black text-black text-center h-auto py-1 text-xs bg-gray-50">外泊</TableHead>
+                        <TableRow className="h-[30px]">
+                            <TableHead className={cn(headerClass, "w-[60px] bg-green-100/50")}>朝食</TableHead>
+                            <TableHead className={cn(headerClass, "w-[60px] bg-green-100/50")}>昼食</TableHead>
+                            <TableHead className={cn(headerClass, "w-[60px] bg-green-100/50")}>夕食</TableHead>
+                            <TableHead className={cn(headerClass, "w-[60px] bg-green-100/50")}>GH</TableHead>
+                            <TableHead className={cn(headerClass, "w-[60px] bg-green-100/50")}>日中活動</TableHead>
+                            <TableHead className={cn(headerClass, "w-[200px] bg-green-100/50")}>その他福祉サービス利用</TableHead>
+                            <TableHead className={cn(headerClass, "w-[60px] bg-green-100/50")}>GH泊</TableHead>
+                            <TableHead className={cn(headerClass, "w-[60px] bg-green-100/50")}>救急搬送</TableHead>
+                            <TableHead className={cn(headerClass, "w-[60px] bg-green-100/50")}>入院</TableHead>
+                            <TableHead className={cn(headerClass, "w-[60px] bg-green-100/50")}>外泊</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {residents.map((resident) => (
-                            <TableRow key={resident.id} className="hover:bg-blue-50/50 border-b border-black h-[48px]">
-                                <TableCell className="border border-black p-2 font-medium bg-white">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs text-gray-400 w-4 text-right">No.</span>
+                        {residents.map((resident) => {
+                            const rId = resident.id
+                            const val = (k: keyof DailyRecord) => getValue(rId, k)
+                            const setVal = (k: keyof DailyRecord, v: any) => handleSave(rId, k, v)
+
+                            return (
+                                <TableRow key={resident.id} className="divide-x divide-black border-b border-black">
+                                    <TableCell className="p-2 border border-black font-bold text-center bg-white">
                                         {resident.name}
-                                    </div>
-                                </TableCell>
+                                    </TableCell>
 
-                                {/* Meals */}
-                                <Cell resident={resident} colKey="meal_breakfast" label="朝食" className="text-center align-middle">
-                                    <input
-                                        type="checkbox"
-                                        className="w-5 h-5 accent-green-600 cursor-pointer"
-                                        checked={getValue(resident.id, 'meal_breakfast') === 'true'}
-                                        onChange={(e) => handleSave(resident.id, 'meal_breakfast', e.target.checked)}
-                                    />
-                                </Cell>
-                                <Cell resident={resident} colKey="meal_lunch" label="昼食" className="text-center align-middle">
-                                    <input
-                                        type="checkbox"
-                                        className="w-5 h-5 accent-green-600 cursor-pointer"
-                                        checked={getValue(resident.id, 'meal_lunch') === 'true'}
-                                        onChange={(e) => handleSave(resident.id, 'meal_lunch', e.target.checked)}
-                                    />
-                                </Cell>
-                                <Cell resident={resident} colKey="meal_dinner" label="夕食" className="text-center align-middle">
-                                    <input
-                                        type="checkbox"
-                                        className="w-5 h-5 accent-green-600 cursor-pointer"
-                                        checked={getValue(resident.id, 'meal_dinner') === 'true'}
-                                        onChange={(e) => handleSave(resident.id, 'meal_dinner', e.target.checked)}
-                                    />
-                                </Cell>
+                                    {/* Meals */}
+                                    <FindingCell residentId={rId} colKey="meal_breakfast" label="朝食">
+                                        <div className="flex justify-center items-center h-full">
+                                            <input type="checkbox" className={checkboxClass} checked={!!val('meal_breakfast')} onChange={e => setVal('meal_breakfast', e.target.checked)} />
+                                        </div>
+                                    </FindingCell>
+                                    <FindingCell residentId={rId} colKey="meal_lunch" label="昼食">
+                                        <div className="flex justify-center items-center h-full">
+                                            <input type="checkbox" className={checkboxClass} checked={!!val('meal_lunch')} onChange={e => setVal('meal_lunch', e.target.checked)} />
+                                        </div>
+                                    </FindingCell>
+                                    <FindingCell residentId={rId} colKey="meal_dinner" label="夕食">
+                                        <div className="flex justify-center items-center h-full">
+                                            <input type="checkbox" className={checkboxClass} checked={!!val('meal_dinner')} onChange={e => setVal('meal_dinner', e.target.checked)} />
+                                        </div>
+                                    </FindingCell>
 
-                                {/* Day Activity */}
-                                <Cell resident={resident} colKey="activity_gh" label="GH" className="text-center align-middle">
-                                    <input
-                                        type="checkbox"
-                                        className="w-5 h-5 accent-green-600 cursor-pointer"
-                                        checked={getValue(resident.id, 'activity_gh') === 'true'}
-                                        onChange={(e) => handleSave(resident.id, 'activity_gh', e.target.checked)}
-                                    />
-                                </Cell>
-                                <Cell resident={resident} colKey="activity_day_support" label="日中活動" className="text-center align-middle">
-                                    <input
-                                        type="checkbox"
-                                        className="w-5 h-5 accent-green-600 cursor-pointer"
-                                        checked={getValue(resident.id, 'activity_day_support') === 'true'}
-                                        onChange={(e) => handleSave(resident.id, 'activity_day_support', e.target.checked)}
-                                    />
-                                </Cell>
-                                <Cell resident={resident} colKey="activity_other" label="その他福祉サービス">
-                                    <select
-                                        className="w-full h-full bg-transparent border-none outline-none text-center cursor-pointer min-h-[40px]"
-                                        value={getValue(resident.id, 'activity_other')}
-                                        onChange={(e) => handleSave(resident.id, 'activity_other', e.target.value)}
-                                    >
-                                        <option value="">-</option>
-                                        <option value="day_service">デイサービス</option>
-                                        <option value="visit_nursing">訪問看護</option>
-                                        <option value="helper">ヘルパー</option>
-                                    </select>
-                                </Cell>
+                                    {/* Day Activity - GH */}
+                                    <FindingCell residentId={rId} colKey="is_gh" label="GH(日中)">
+                                        <div className="flex justify-center items-center h-full">
+                                            <input type="checkbox" className={checkboxClass} checked={!!val('is_gh')} onChange={e => setVal('is_gh', e.target.checked)} />
+                                        </div>
+                                    </FindingCell>
 
-                                {/* Night Activity */}
-                                <Cell resident={resident} colKey="night_gh" label="GH泊" className="text-center align-middle bg-[#d9ead3]">
-                                    <input
-                                        type="checkbox"
-                                        className="w-5 h-5 accent-green-600 cursor-pointer"
-                                        checked={getValue(resident.id, 'night_gh') === 'true'}
-                                        onChange={(e) => handleSave(resident.id, 'night_gh', e.target.checked)}
-                                    />
-                                </Cell>
-                                <Cell resident={resident} colKey="night_ambulance" label="救急" className="text-center align-middle">
-                                    <input
-                                        type="checkbox"
-                                        className="w-5 h-5 accent-green-600 cursor-pointer"
-                                        checked={getValue(resident.id, 'night_ambulance') === 'true'}
-                                        onChange={(e) => handleSave(resident.id, 'night_ambulance', e.target.checked)}
-                                    />
-                                </Cell>
-                                <Cell resident={resident} colKey="hosp" label="入院" className="text-center align-middle">
-                                    <input
-                                        type="checkbox"
-                                        className="w-5 h-5 accent-green-600 cursor-pointer"
-                                        checked={getValue(resident.id, 'hosp') === 'true'}
-                                        onChange={(e) => handleSave(resident.id, 'hosp', e.target.checked)}
-                                    />
-                                </Cell>
-                                <Cell resident={resident} colKey="overnight" label="外泊" className="text-center align-middle">
-                                    <input
-                                        type="checkbox"
-                                        className="w-5 h-5 accent-green-600 cursor-pointer"
-                                        checked={getValue(resident.id, 'overnight') === 'true'}
-                                        onChange={(e) => handleSave(resident.id, 'overnight', e.target.checked)}
-                                    />
-                                </Cell>
+                                    {/* Day Activity */}
+                                    <FindingCell residentId={rId} colKey="daytime_activity" label="日中活動">
+                                        <div className="flex justify-center items-center h-full">
+                                            <input type="checkbox" className={checkboxClass} checked={!!val('daytime_activity')} onChange={e => setVal('daytime_activity', e.target.checked)} />
+                                        </div>
+                                    </FindingCell>
 
-                            </TableRow>
-                        ))}
+                                    {/* Other Service */}
+                                    <FindingCell residentId={rId} colKey="other_welfare_service" label="その他福祉">
+                                        <select
+                                            className="w-full h-full border-none bg-transparent text-center text-xs focus:ring-0 appearance-none cursor-pointer"
+                                            value={(val('other_welfare_service') as string) || "none"}
+                                            onChange={e => setVal('other_welfare_service', e.target.value === "none" ? null : e.target.value)}
+                                        >
+                                            <option value="none" className="bg-gray-100"></option>
+                                            <option value="生活介護">生活介護</option>
+                                            <option value="居宅介護">居宅介護</option>
+                                            <option value="重度訪問介護">重度訪問介護</option>
+                                            <option value="行動援護">行動援護</option>
+                                            <option value="移動支援">移動支援</option>
+                                        </select>
+                                    </FindingCell>
+
+                                    {/* Night - GH Stay */}
+                                    <FindingCell residentId={rId} colKey="is_gh_night" label="GH泊">
+                                        <div className="flex justify-center items-center h-full">
+                                            <input type="checkbox" className={checkboxClass} checked={!!val('is_gh_night')} onChange={e => setVal('is_gh_night', e.target.checked)} />
+                                        </div>
+                                    </FindingCell>
+
+                                    {/* Emergency */}
+                                    <FindingCell residentId={rId} colKey="emergency_transport" label="救急搬送">
+                                        <div className="flex justify-center items-center h-full">
+                                            <input type="checkbox" className={checkboxClass} checked={!!val('emergency_transport')} onChange={e => setVal('emergency_transport', e.target.checked)} />
+                                        </div>
+                                    </FindingCell>
+
+                                    {/* Hospitalization */}
+                                    <FindingCell residentId={rId} colKey="hospitalization_status" label="入院">
+                                        <div className="flex justify-center items-center h-full">
+                                            <input type="checkbox" className={checkboxClass} checked={!!val('hospitalization_status')} onChange={e => setVal('hospitalization_status', e.target.checked)} />
+                                        </div>
+                                    </FindingCell>
+
+                                    {/* Overnight */}
+                                    <FindingCell residentId={rId} colKey="overnight_stay_status" label="外泊">
+                                        <div className="flex justify-center items-center h-full">
+                                            <input type="checkbox" className={checkboxClass} checked={!!val('overnight_stay_status')} onChange={e => setVal('overnight_stay_status', e.target.checked)} />
+                                        </div>
+                                    </FindingCell>
+                                </TableRow>
+                            )
+                        })}
                     </TableBody>
                 </Table>
             </div>

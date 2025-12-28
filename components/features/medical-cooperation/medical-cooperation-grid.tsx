@@ -208,22 +208,18 @@ export function MedicalCooperationGrid({ residents, nurses, records, currentDate
                                             className="p-0 border-r min-w-[40px] h-8 text-center padding-0 relative"
                                             onContextMenu={(e) => handleContextMenu(e, record?.id, resident.name, dateStr)}
                                         >
-                                            <Select
+                                            <select
+                                                className={`h-8 w-full border-none shadow-none focus:ring-0 px-0 text-center text-xs bg-transparent cursor-pointer outline-none appearance-none ${pendingChanges.has(`${resident.id}:${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`) ? 'bg-orange-200' : ''}`}
                                                 value={record?.staff_id || 'none'}
-                                                onValueChange={(val) => handleSelect(resident.id, day, val)}
+                                                onChange={(e) => handleSelect(resident.id, day, e.target.value)}
                                             >
-                                                <SelectTrigger className={`h-8 w-full border-none shadow-none focus:ring-0 px-0 justify-center text-xs bg-transparent data-[placeholder]:text-transparent ${pendingChanges.has(`${resident.id}:${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`) ? 'bg-orange-200' : ''}`}>
-                                                    <SelectValue placeholder="" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="none" className="text-gray-400">-</SelectItem>
-                                                    {nurses.map(nurse => (
-                                                        <SelectItem key={nurse.id} value={nurse.id} className="text-xs">
-                                                            {nurse.name}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
+                                                <option value="none" className="text-gray-400">-</option>
+                                                {nurses.map(nurse => (
+                                                    <option key={nurse.id} value={nurse.id} className="text-black">
+                                                        {nurse.name}
+                                                    </option>
+                                                ))}
+                                            </select>
                                             {showIndicator && (
                                                 <div className="absolute top-0 right-0 w-0 h-0 border-t-[6px] border-r-[6px] border-t-red-500 border-r-transparent pointer-events-none" />
                                             )}

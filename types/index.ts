@@ -56,14 +56,13 @@ export type FeedbackComment = {
 
 export type FindingComment = {
     id: string
-
     daily_record_id?: string
     medical_record_id?: string
-    json_path: string | null
-    content: string
-    author_name: string
-    is_resolved: boolean
+    short_stay_record_id?: string
+    json_path: string
+    comment: string
     created_at: string
+    updated_at: string
 }
 
 export type ShortStayRecord = {
@@ -75,9 +74,9 @@ export type ShortStayRecord = {
     meal_breakfast: boolean
     meal_lunch: boolean
     meal_dinner: boolean
+    meal_provided_lunch: boolean
     is_gh: boolean
     is_gh_night: boolean
-    meal_provided_lunch: boolean
     daytime_activity: string | null
     other_welfare_service: string | null
     entry_time: string | null
@@ -138,6 +137,14 @@ export type DailyRecord = {
     date: string
     hospitalization_status: boolean
     overnight_stay_status: boolean
+    meal_breakfast: boolean
+    meal_lunch: boolean
+    meal_dinner: boolean
+    is_gh: boolean
+    daytime_activity: boolean
+    other_welfare_service: string | null
+    is_gh_night: boolean
+    emergency_transport: boolean
     data: Record<string, any> // JSONB
     created_at: string
     updated_at: string

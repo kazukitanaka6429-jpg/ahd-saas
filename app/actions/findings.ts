@@ -8,7 +8,7 @@ import { FindingComment } from '@/types'
 export async function getFindingComments(
     recordId: string,
     jsonPath: string,
-    recordType: 'daily' | 'medical' = 'daily'
+    recordType: 'daily' | 'medical' | 'short_stay' = 'daily'
 ) {
     const supabase = await createClient()
     let query = supabase
@@ -19,14 +19,16 @@ export async function getFindingComments(
 
     if (recordType === 'daily') {
         query = query.eq('daily_record_id', recordId)
-    } else {
+    } else if (recordType === 'medical') {
         query = query.eq('medical_record_id', recordId)
+    } else if (recordType === 'short_stay') {
+        query = query.eq('short_stay_record_id', recordId)
     }
 
     const { data, error } = await query
 
     if (error) {
-        console.error('Error fetching findings:', error)
+        console.error('Error fetching comments:', error)
         return []
     }
     return data as FindingComment[]
@@ -36,7 +38,7 @@ export async function addFindingComment(
     recordId: string,
     jsonPath: string,
     content: string,
-    recordType: 'daily' | 'medical' = 'daily'
+    recordType: 'daily' | 'medical' | 'short_stay' = 'daily'
 ) {
     const staff = await getCurrentStaff()
     if (!staff) throw new Error('Unauthorized')
@@ -52,8 +54,10 @@ export async function addFindingComment(
 
     if (recordType === 'daily') {
         payload.daily_record_id = recordId
-    } else {
+    } else if (recordType === 'medical') {
         payload.medical_record_id = recordId
+    } else if (recordType === 'short_stay') {
+        payload.short_stay_record_id = recordId
     }
 
     const { error } = await supabase
@@ -90,7 +94,7 @@ export async function toggleFindingResolved(commentId: string, currentStatus: bo
 // Function to fetch all findings for a date (to show indicators on grid)
 export async function getFindingsCountByRecord(
     date: string,
-    recordType: 'daily' | 'medical' = 'daily'
+    recordType: 'daily' | 'medical' | 'short_stay' = 'daily'
 ) {
     const staff = await getCurrentStaff()
     if (!staff) return {}
@@ -100,6 +104,8 @@ export async function getFindingsCountByRecord(
     let tableName = 'daily_records'
     if (recordType === 'medical') {
         tableName = 'medical_cooperation_records'
+    } else if (recordType === 'short_stay') {
+        tableName = 'short_stay_records'
     }
 
     // Step 1: Get record IDs for that date
@@ -116,12 +122,14 @@ export async function getFindingsCountByRecord(
     // Step 2: Get findings
     let query = supabase
         .from('finding_comments')
-        .select('daily_record_id, medical_record_id, json_path, is_resolved')
+        .select('daily_record_id, medical_record_id, short_stay_record_id, json_path, is_resolved')
 
     if (recordType === 'daily') {
         query = query.in('daily_record_id', ids)
-    } else {
+    } else if (recordType === 'medical') {
         query = query.in('medical_record_id', ids)
+    } else if (recordType === 'short_stay') {
+        query = query.in('short_stay_record_id', ids)
     }
 
     const { data: findings } = await query
@@ -134,7 +142,10 @@ export async function getFindingsCountByRecord(
     findings.forEach(f => {
         if (!f.is_resolved) {
             // Determine relevant ID based on type
-            const recordId = recordType === 'daily' ? f.daily_record_id : f.medical_record_id
+            let recordId: string | undefined | null
+            if (recordType === 'daily') recordId = f.daily_record_id
+            else if (recordType === 'medical') recordId = f.medical_record_id
+            else if (recordType === 'short_stay') recordId = f.short_stay_record_id
 
             if (recordId) {
                 if (!indicators[recordId]) {
@@ -153,7 +164,7 @@ export async function getFindingsCountByRecord(
 export async function getFindingsCountByRange(
     startDate: string,
     endDate: string,
-    recordType: 'daily' | 'medical' = 'daily'
+    recordType: 'daily' | 'medical' | 'short_stay' = 'daily'
 ) {
     const staff = await getCurrentStaff()
     if (!staff) return {}
@@ -163,6 +174,8 @@ export async function getFindingsCountByRange(
     let tableName = 'daily_records'
     if (recordType === 'medical') {
         tableName = 'medical_cooperation_records'
+    } else if (recordType === 'short_stay') {
+        tableName = 'short_stay_records'
     }
 
     // Step 1: Get record IDs for the range
@@ -178,18 +191,16 @@ export async function getFindingsCountByRange(
     const ids = records.map((r: any) => r.id)
 
     // Step 2: Get findings
-    // Chunking might be needed if IDs are too many (e.g. 30 days x 50 residents = 1500 records).
-    // Supabase 'in' filter limit is usually high enough, but good to be safe.
-    // For now assuming < 65535 parameters logic of Postgres applies, 1500 is fine.
-
     let query = supabase
         .from('finding_comments')
-        .select('daily_record_id, medical_record_id, json_path, is_resolved')
+        .select('daily_record_id, medical_record_id, short_stay_record_id, json_path, is_resolved')
 
     if (recordType === 'daily') {
         query = query.in('daily_record_id', ids)
-    } else {
+    } else if (recordType === 'medical') {
         query = query.in('medical_record_id', ids)
+    } else if (recordType === 'short_stay') {
+        query = query.in('short_stay_record_id', ids)
     }
 
     const { data: findings } = await query
@@ -201,7 +212,11 @@ export async function getFindingsCountByRange(
 
     findings.forEach(f => {
         if (!f.is_resolved) {
-            const recordId = recordType === 'daily' ? f.daily_record_id : f.medical_record_id
+            let recordId: string | undefined | null
+            if (recordType === 'daily') recordId = f.daily_record_id
+            else if (recordType === 'medical') recordId = f.medical_record_id
+            else if (recordType === 'short_stay') recordId = f.short_stay_record_id
+
             if (recordId) {
                 if (!indicators[recordId]) {
                     indicators[recordId] = []
