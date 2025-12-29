@@ -164,9 +164,10 @@ export async function upsertDailyRecordsBulk(records: {
     meal_lunch?: boolean
     meal_dinner?: boolean
     is_gh?: boolean
-    daytime_activity?: boolean
+    daytime_activity?: boolean | string | null
     other_welfare_service?: string | null
     is_gh_night?: boolean
+    is_gh_stay?: boolean
     emergency_transport?: boolean
 }[]) {
     const staff = await getCurrentStaff()
@@ -174,12 +175,6 @@ export async function upsertDailyRecordsBulk(records: {
     const facilityId = staff.facility_id
 
     const supabase = await createClient()
-
-    // Processing: We need to merge JSONB data.
-    // Efficient Approach:
-    // 1. Fetch existing records for the (resident, date) tuples.
-    // 2. Merge in memory.
-    // 3. Upsert.
 
     // Optimization: In this app, users save for a specific DATE usually.
     const dates = new Set(records.map(r => r.date))
@@ -196,8 +191,21 @@ export async function upsertDailyRecordsBulk(records: {
         const upsertData = records.map(r => {
             const existing = existingMap.get(r.resident_id)
             const oldData = existing?.data || {}
-            // Merge: new data overwrites old data keys
-            const newData = { ...oldData, ...r.data }
+
+            // Prepare extension fields for JSONB storage
+            const extensionFields = {
+                meal_breakfast: r.meal_breakfast ?? existing?.data?.meal_breakfast ?? existing?.meal_breakfast ?? false,
+                meal_lunch: r.meal_lunch ?? existing?.data?.meal_lunch ?? existing?.meal_lunch ?? false,
+                meal_dinner: r.meal_dinner ?? existing?.data?.meal_dinner ?? existing?.meal_dinner ?? false,
+                is_gh: r.is_gh ?? existing?.data?.is_gh ?? existing?.is_gh ?? false,
+                daytime_activity: (typeof r.daytime_activity === 'boolean' && r.daytime_activity) ? 'あり' : (r.daytime_activity ?? existing?.data?.daytime_activity ?? existing?.daytime_activity ?? null),
+                other_welfare_service: r.other_welfare_service ?? existing?.data?.other_welfare_service ?? existing?.other_welfare_service ?? null,
+                is_gh_night: r.is_gh_night ?? existing?.data?.is_gh_night ?? existing?.is_gh_night ?? false,
+                is_gh_stay: r.is_gh_stay ?? existing?.data?.is_gh_stay ?? existing?.is_gh_stay ?? false,
+                emergency_transport: r.emergency_transport ?? existing?.data?.emergency_transport ?? existing?.emergency_transport ?? false
+            }
+
+            const newData = { ...oldData, ...r.data, ...extensionFields }
 
             return {
                 facility_id: facilityId,
@@ -205,15 +213,7 @@ export async function upsertDailyRecordsBulk(records: {
                 date: r.date,
                 data: newData,
                 hospitalization_status: r.hospitalization_status ?? existing?.hospitalization_status ?? false,
-                overnight_stay_status: r.overnight_stay_status ?? existing?.overnight_stay_status ?? false,
-                meal_breakfast: r.meal_breakfast ?? existing?.meal_breakfast ?? false,
-                meal_lunch: r.meal_lunch ?? existing?.meal_lunch ?? false,
-                meal_dinner: r.meal_dinner ?? existing?.meal_dinner ?? false,
-                is_gh: r.is_gh ?? existing?.is_gh ?? false,
-                daytime_activity: r.daytime_activity ?? existing?.daytime_activity ?? false,
-                other_welfare_service: r.other_welfare_service ?? existing?.other_welfare_service ?? null,
-                is_gh_night: r.is_gh_night ?? existing?.is_gh_night ?? false,
-                emergency_transport: r.emergency_transport ?? existing?.emergency_transport ?? false
+                overnight_stay_status: r.overnight_stay_status ?? existing?.overnight_stay_status ?? false
             }
         })
 
@@ -229,22 +229,28 @@ export async function upsertDailyRecordsBulk(records: {
         // Multi-date save (fallback)
         for (const r of records) {
             const { data: existing } = await supabase.from('daily_records').select('*').eq('facility_id', facilityId).eq('resident_id', r.resident_id).eq('date', r.date).single()
-            const newData = { ...(existing?.data || {}), ...r.data }
+
+            const extensionFields = {
+                meal_breakfast: r.meal_breakfast ?? existing?.data?.meal_breakfast ?? existing?.meal_breakfast ?? false,
+                meal_lunch: r.meal_lunch ?? existing?.data?.meal_lunch ?? existing?.meal_lunch ?? false,
+                meal_dinner: r.meal_dinner ?? existing?.data?.meal_dinner ?? existing?.meal_dinner ?? false,
+                is_gh: r.is_gh ?? existing?.data?.is_gh ?? existing?.is_gh ?? false,
+                daytime_activity: (typeof r.daytime_activity === 'boolean' && r.daytime_activity) ? 'あり' : (r.daytime_activity ?? existing?.data?.daytime_activity ?? existing?.daytime_activity ?? null),
+                other_welfare_service: r.other_welfare_service ?? existing?.data?.other_welfare_service ?? existing?.other_welfare_service ?? null,
+                is_gh_night: r.is_gh_night ?? existing?.data?.is_gh_night ?? existing?.is_gh_night ?? false,
+                is_gh_stay: r.is_gh_stay ?? existing?.data?.is_gh_stay ?? existing?.is_gh_stay ?? false,
+                emergency_transport: r.emergency_transport ?? existing?.data?.emergency_transport ?? existing?.emergency_transport ?? false
+            }
+
+            const newData = { ...(existing?.data || {}), ...r.data, ...extensionFields }
+
             await supabase.from('daily_records').upsert({
                 facility_id: facilityId,
                 resident_id: r.resident_id,
                 date: r.date,
                 data: newData,
                 hospitalization_status: r.hospitalization_status ?? existing?.hospitalization_status ?? false,
-                overnight_stay_status: r.overnight_stay_status ?? existing?.overnight_stay_status ?? false,
-                meal_breakfast: r.meal_breakfast ?? existing?.meal_breakfast ?? false,
-                meal_lunch: r.meal_lunch ?? existing?.meal_lunch ?? false,
-                meal_dinner: r.meal_dinner ?? existing?.meal_dinner ?? false,
-                is_gh: r.is_gh ?? existing?.is_gh ?? false,
-                daytime_activity: r.daytime_activity ?? existing?.daytime_activity ?? false,
-                other_welfare_service: r.other_welfare_service ?? existing?.other_welfare_service ?? null,
-                is_gh_night: r.is_gh_night ?? existing?.is_gh_night ?? false,
-                emergency_transport: r.emergency_transport ?? existing?.emergency_transport ?? false
+                overnight_stay_status: r.overnight_stay_status ?? existing?.overnight_stay_status ?? false
             }, { onConflict: 'resident_id, date' })
         }
     }

@@ -141,11 +141,26 @@ export type DailyRecord = {
     meal_lunch: boolean
     meal_dinner: boolean
     is_gh: boolean
-    daytime_activity: boolean
+    daytime_activity: string | null // Changed to string for flexibility
     other_welfare_service: string | null
     is_gh_night: boolean
+    is_gh_stay: boolean // Added
     emergency_transport: boolean
     data: Record<string, any> // JSONB
     created_at: string
     updated_at: string
 }
+
+export type StayPeriod = {
+    start: string | null; // MM/DD
+    end: string | null;   // MM/DD
+    type: 'hospitalization' | 'overnight';
+};
+
+export type ResidentStayData = {
+    residentName: string;
+    residentId: string;
+    facilityName: string;
+    enrollmentDays: number; // 在籍日数
+    periods: StayPeriod[]; // 最大10件
+};

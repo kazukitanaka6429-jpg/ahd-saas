@@ -72,10 +72,10 @@ export default async function ResidentsPage() {
                             <TableRow className="bg-gray-50/50">
                                 <TableHead className="min-w-[150px]">氏名</TableHead>
                                 <TableHead>施設</TableHead>
-                                <TableHead>介護度</TableHead>
+
                                 <TableHead>状況</TableHead>
                                 <TableHead>区分</TableHead>
-                                <TableHead>開始日</TableHead>
+                                <TableHead>入居日</TableHead>
                                 <TableHead>口振開始</TableHead>
                                 <TableHead>主保険</TableHead>
                                 <TableHead>限度額</TableHead>
@@ -94,7 +94,7 @@ export default async function ResidentsPage() {
                                 <TableRow key={resident.id}>
                                     <TableCell className="font-medium sticky left-0 bg-white z-10">{resident.name}</TableCell>
                                     <TableCell>{resident.facilities?.name || '-'}</TableCell>
-                                    <TableCell>{resident.care_level || '-'}</TableCell>
+
                                     <TableCell>{getStatusLabel(resident.status)}</TableCell>
                                     <TableCell>{resident.classification || '-'}</TableCell>
                                     <TableCell>{resident.start_date}</TableCell>

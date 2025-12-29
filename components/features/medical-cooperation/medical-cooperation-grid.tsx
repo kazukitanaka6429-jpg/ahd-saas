@@ -201,15 +201,34 @@ export function MedicalCooperationGrid({ residents, nurses, records, currentDate
                                     const record = getRecord(resident.id, day)
                                     const showIndicator = hasFinding(record?.id)
                                     const dateStr = `${month + 1}/${day}`
+                                    const fullDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+
+                                    // Calculate Nurse Load for this specific day and staff
+                                    // Count how many residents this staff is assigned to on this day
+                                    let nurseLoad = 0
+                                    if (record?.staff_id) {
+                                        nurseLoad = localRecords.filter(r => r.date === fullDateStr && r.staff_id === record.staff_id).length
+                                    }
+
+                                    // Determine Background Color based on Nurse Load
+                                    let bgClass = 'bg-transparent'
+                                    if (record?.staff_id) {
+                                        if (nurseLoad === 2) bgClass = 'bg-cyan-100'
+                                        else if (nurseLoad >= 3) bgClass = 'bg-yellow-100'
+                                        // Count 1 remains transparent (white)
+                                    }
+                                    if (pendingChanges.has(`${resident.id}:${fullDateStr}`)) {
+                                        bgClass = 'bg-orange-200' // Pending change override
+                                    }
 
                                     return (
                                         <TableCell
                                             key={day}
-                                            className="p-0 border-r min-w-[40px] h-8 text-center padding-0 relative"
+                                            className={`p-0 border-r min-w-[40px] h-8 text-center padding-0 relative ${bgClass}`}
                                             onContextMenu={(e) => handleContextMenu(e, record?.id, resident.name, dateStr)}
                                         >
                                             <select
-                                                className={`h-8 w-full border-none shadow-none focus:ring-0 px-0 text-center text-xs bg-transparent cursor-pointer outline-none appearance-none ${pendingChanges.has(`${resident.id}:${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`) ? 'bg-orange-200' : ''}`}
+                                                className={`h-8 w-full border-none shadow-none focus:ring-0 px-0 text-center text-xs bg-transparent cursor-pointer outline-none appearance-none`}
                                                 value={record?.staff_id || 'none'}
                                                 onChange={(e) => handleSelect(resident.id, day, e.target.value)}
                                             >

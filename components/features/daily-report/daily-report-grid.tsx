@@ -9,7 +9,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { upsertDailyRecordsBulk } from '@/app/(dashboard)/daily-reports/actions'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -17,6 +17,8 @@ import { Loader2, Save } from 'lucide-react'
 import { FindingSheet } from './finding-sheet'
 import { useGlobalSave } from '@/components/providers/global-save-context'
 import { cn } from '@/lib/utils'
+import { validateDailyReport, ValidationError, ValidationWarning, hasFieldError } from '@/lib/daily-report-validation'
+import { ValidationWarningModal } from './validation-warning-modal'
 
 interface DailyReportGridProps {
     residents: Resident[]
@@ -26,7 +28,7 @@ interface DailyReportGridProps {
 }
 
 export function DailyReportGrid({ residents, defaultRecords, date, findingsIndicators = {} }: DailyReportGridProps) {
-    const { registerSaveNode, unregisterSaveNode, triggerGlobalSave, isSaving: isGlobalSaving } = useGlobalSave()
+    const { registerSaveNode, unregisterSaveNode, registerValidation, unregisterValidation, triggerGlobalSave, isSaving: isGlobalSaving, getSharedState } = useGlobalSave()
 
     // Optimistic UI State
     const [localData, setLocalData] = useState<Map<string, DailyRecord>>(() => {
@@ -38,6 +40,11 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
     })
 
     const [pendingChanges, setPendingChanges] = useState<Map<string, Partial<DailyRecord>>>(new Map())
+
+    // Validation State
+    const [validationErrors, setValidationErrors] = useState<ValidationError[]>([])
+    const [pendingWarnings, setPendingWarnings] = useState<ValidationWarning[]>([])
+    const [showWarningModal, setShowWarningModal] = useState(false)
 
     // Findings State
     const [findingState, setFindingState] = useState<{
@@ -54,7 +61,47 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
         })
         setLocalData(map)
         setPendingChanges(new Map())
+        setValidationErrors([])
     }, [defaultRecords])
+
+    // Validation function that returns current validation state
+    const runValidation = useCallback(() => {
+        const nightStaffCount = getSharedState<number>('nightStaffCount') || 0
+        const nightShiftPlus = getSharedState<boolean>('nightShiftPlus') || false
+        console.log('[DailyReportGrid] Running validation with nightStaffCount:', nightStaffCount, 'nightShiftPlus:', nightShiftPlus)
+
+        // Build records from localData
+        const recordsToValidate = residents.map(resident => {
+            const record = localData.get(resident.id)
+            const data = record?.data || {}
+            return {
+                residentId: resident.id,
+                residentName: resident.name,
+                data: {
+                    is_gh: (data as any)?.is_gh ?? record?.is_gh ?? false,
+                    is_gh_night: (data as any)?.is_gh_night ?? record?.is_gh_night ?? false,
+                    daytime_activity: (data as any)?.daytime_activity ?? record?.daytime_activity ?? false,
+                    other_welfare_service: (data as any)?.other_welfare_service ?? record?.other_welfare_service ?? null,
+                    meal_lunch: (data as any)?.meal_lunch ?? record?.meal_lunch ?? false,
+                    emergency_transport: (data as any)?.emergency_transport ?? record?.emergency_transport ?? false,
+                    hospitalization_status: (data as any)?.hospitalization_status ?? record?.hospitalization_status ?? false,
+                    overnight_stay_status: (data as any)?.overnight_stay_status ?? record?.overnight_stay_status ?? false,
+                }
+            }
+        })
+
+        const result = validateDailyReport(recordsToValidate, nightStaffCount, nightShiftPlus)
+        console.log('[DailyReportGrid] Validation result:', result.errors.length, 'errors,', result.warnings.length, 'warnings')
+        setValidationErrors(result.errors)
+        return result
+    }, [residents, localData, getSharedState])
+
+    // Register validation function
+    useEffect(() => {
+        const id = 'daily-report-grid-validation'
+        registerValidation(id, runValidation)
+        return () => unregisterValidation(id)
+    }, [registerValidation, unregisterValidation, runValidation])
 
     // Register Save Function
     useEffect(() => {
@@ -84,28 +131,97 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
     const getValue = (residentId: string, key: keyof DailyRecord) => {
         const record = localData.get(residentId)
         if (!record) return undefined
-        return record[key]
+        // Fallback: Prioritize data JSONB because top-level columns might be missing or empty in Supabase response
+        return (record.data as any)?.[key] ?? record[key]
     }
 
     const handleSave = (residentId: string, column: keyof DailyRecord, value: any) => {
         setLocalData(prev => {
             const newMap = new Map(prev)
-            const current = newMap.get(residentId) || { resident_id: residentId } as DailyRecord
-            newMap.set(residentId, { ...current, [column]: value })
+            const current = newMap.get(residentId) || { resident_id: residentId, data: {} } as DailyRecord
+
+            // Mutual Exclusion Logic: is_gh vs daytime_activity
+            let extraUpdates: Partial<DailyRecord> = {}
+            let extraUpdatesData: Record<string, any> = {}
+
+            if (column === 'is_gh' && value === true) {
+                // daytime_activity is string | null
+                extraUpdates = { daytime_activity: null }
+                extraUpdatesData = { daytime_activity: null }
+            } else if (column === 'daytime_activity') {
+                // Check if value is truthy (non-empty string or true if handled as such)
+                const isTruthy = value === true || (typeof value === 'string' && value.length > 0)
+                if (isTruthy) {
+                    extraUpdates = { is_gh: false }
+                    extraUpdatesData = { is_gh: false }
+                }
+            }
+
+            // CRITICAL: Update BOTH top-level and nested data object
+            // getValue prioritizes data[key], so we must update data[key]
+            const updatedData = {
+                ...(current.data || {}),
+                [column]: value,
+                ...extraUpdatesData
+            }
+
+            newMap.set(residentId, {
+                ...current,
+                [column]: value,
+                ...extraUpdates,
+                data: updatedData
+            })
             return newMap
         })
 
         setPendingChanges(prev => {
             const newMap = new Map(prev)
             const current = newMap.get(residentId) || {}
-            newMap.set(residentId, { ...current, [column]: value })
+
+            // Apply mutual exclusion to pending changes too
+            let extraUpdates: Partial<DailyRecord> = {}
+            if (column === 'is_gh' && value === true) {
+                extraUpdates = { daytime_activity: null }
+            } else if (column === 'daytime_activity') {
+                const isTruthy = value === true || (typeof value === 'string' && value.length > 0)
+                if (isTruthy) {
+                    extraUpdates = { is_gh: false }
+                }
+            }
+
+            newMap.set(residentId, {
+                ...current,
+                [column]: value,
+                ...extraUpdates
+            })
             return newMap
         })
     }
 
     const onManualSave = async () => {
-        await triggerGlobalSave()
+        const result = await triggerGlobalSave()
+
+        // If there are warnings, show modal
+        if (result.warnings && result.warnings.length > 0) {
+            setPendingWarnings(result.warnings)
+            setShowWarningModal(true)
+        }
     }
+
+    const handleWarningConfirm = async () => {
+        setShowWarningModal(false)
+        setPendingWarnings([])
+        // Retry save with warnings skipped
+        await triggerGlobalSave(true)
+    }
+
+    const handleWarningCancel = () => {
+        setShowWarningModal(false)
+        setPendingWarnings([])
+    }
+
+    // Helper to check if a cell has a validation error
+    const hasError = (residentId: string, field: string) => hasFieldError(validationErrors, residentId, field)
 
     const handleContextMenu = (e: React.MouseEvent, residentId: string, key: string, label: string) => {
         e.preventDefault()
@@ -134,9 +250,14 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
 
     const FindingCell = ({ residentId, colKey, children, className = "", label }: { residentId: string, colKey: string, children: React.ReactNode, className?: string, label: string }) => {
         const show = hasFinding(residentId, colKey)
+        const hasValidationError = hasError(residentId, colKey)
         return (
             <TableCell
-                className={cn(cellClass, className)}
+                className={cn(
+                    cellClass,
+                    className,
+                    hasValidationError && "ring-2 ring-red-500 ring-inset bg-red-50"
+                )}
                 onContextMenu={(e) => handleContextMenu(e, residentId, colKey, label)}
             >
                 {children}
@@ -289,6 +410,13 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
                 jsonPath={findingState.jsonPath}
                 label={findingState.label}
                 recordType="daily"
+            />
+
+            <ValidationWarningModal
+                isOpen={showWarningModal}
+                warnings={pendingWarnings}
+                onCancel={handleWarningCancel}
+                onConfirm={handleWarningConfirm}
             />
         </div>
     )
