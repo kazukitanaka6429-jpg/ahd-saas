@@ -22,7 +22,7 @@ interface FindingSheetProps {
     recordId: string | null
     jsonPath: string | null
     label: string
-    recordType?: 'daily' | 'medical' // Default: 'daily'
+    recordType?: 'daily' | 'medical' | 'short_stay' // Default: 'daily'
 }
 
 export function FindingSheet({ isOpen, onClose, recordId, jsonPath, label, recordType = 'daily' }: FindingSheetProps) {
