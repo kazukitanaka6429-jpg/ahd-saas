@@ -37,7 +37,7 @@ export async function importBillingCsv(formData: FormData) {
         // We need to ensure these headers exist.
 
         // Debug first row to check headers if needed
-        const firstRow = records[0]
+        const firstRow = records[0] as any
         if (!('利用者名' in firstRow) || !('利用料項目名' in firstRow) || !('数量' in firstRow)) {
             // Fallback: try column index if headers are variable? 
             // But 'columns: true' relies on header row. 
