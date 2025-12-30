@@ -16,7 +16,7 @@ export async function upsertAndLogHqRecord(
     // 1. Perform Update
     const medicalKeys = Object.keys(records[0].data).filter(k => k.startsWith('medical_iv_'))
 
-    let result = { success: true, error: null as any }
+    let result: { success?: boolean; error?: any } = { success: true, error: null }
 
     if (medicalKeys.length > 0) {
         // Medical Record Update Logic
