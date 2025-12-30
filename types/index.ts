@@ -61,6 +61,9 @@ export type FindingComment = {
     short_stay_record_id?: string
     json_path: string
     comment: string
+    content: string
+    author_name: string
+    is_resolved: boolean
     created_at: string
     updated_at: string
 }
