@@ -68,8 +68,8 @@ export function ShortStayGrid({ residents, record: initialRecord, date }: ShortS
     useEffect(() => {
         if (initialRecord) {
             setFormData(initialRecord)
-            getFindingsCountByRecord(initialRecord.id, 'short_stay').then(paths => {
-                setFindingsPaths(paths as string[])
+            getFindingsCountByRecord(initialRecord.id, 'short_stay').then(pathsMap => {
+                setFindingsPaths(pathsMap[initialRecord.id] || [])
             })
         } else {
             // Reset logic if needed, but usually we just keep default if no record is passed
