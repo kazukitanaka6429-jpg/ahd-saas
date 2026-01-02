@@ -9,9 +9,11 @@ import {
 } from '@/components/ui/table'
 import { CreateStaffDialog } from './create-dialog'
 import { InviteDialog } from './invite-dialog'
+import { InviteLinkButton } from './invite-link-button'
 import { StaffActions } from './staff-actions'
 import { Staff } from '@/types'
 import { Badge } from '@/components/ui/badge'
+import { CheckCircle } from 'lucide-react'
 
 import { requireAuth, isHQ, canAccessMaster } from '@/lib/auth-helpers'
 
@@ -88,6 +90,7 @@ export default async function StaffsPage() {
                                 <TableHead>入社日</TableHead>
                                 <TableHead>退社日</TableHead>
                                 <TableHead>登録日</TableHead>
+                                <TableHead>アカウント</TableHead>
                                 <TableHead className="text-right sticky right-0 bg-white shadow-sm">操作</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -109,6 +112,19 @@ export default async function StaffsPage() {
                                     <TableCell>
                                         {new Date(staff.created_at).toLocaleDateString('ja-JP')}
                                     </TableCell>
+                                    <TableCell>
+                                        {staff.auth_user_id ? (
+                                            <Badge variant="secondary" className="gap-1 bg-green-100 text-green-700">
+                                                <CheckCircle className="h-3 w-3" />
+                                                登録済み
+                                            </Badge>
+                                        ) : (
+                                            <InviteLinkButton
+                                                staffId={staff.id}
+                                                staffName={staff.name}
+                                            />
+                                        )}
+                                    </TableCell>
                                     <TableCell className="text-right sticky right-0 bg-white z-10 shadow-sm">
                                         <StaffActions id={staff.id} name={staff.name} />
                                     </TableCell>
@@ -116,7 +132,7 @@ export default async function StaffsPage() {
                             ))}
                             {staffs?.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={10} className="h-24 text-center">
+                                    <TableCell colSpan={11} className="h-24 text-center">
                                         データがありません。
                                     </TableCell>
                                 </TableRow>
