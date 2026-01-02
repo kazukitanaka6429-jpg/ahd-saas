@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,9 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, AlertCircle, CheckCircle, UserPlus } from 'lucide-react'
 import { validateInviteToken, signUpWithToken } from '@/app/actions/invite'
-import { useEffect } from 'react'
 
-export default function JoinPage() {
+function JoinContent() {
     const searchParams = useSearchParams()
     const router = useRouter()
     const token = searchParams.get('token') || ''
@@ -78,7 +77,6 @@ export default function JoinPage() {
             setSubmitting(false)
         } else if (result.success) {
             setSuccess(true)
-            // 少し待ってからリダイレクト
             setTimeout(() => {
                 router.push(result.redirectTo || '/')
             }, 2000)
@@ -208,5 +206,25 @@ export default function JoinPage() {
                 </CardContent>
             </Card>
         </div>
+    )
+}
+
+// ローディングフォールバック
+function LoadingFallback() {
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="text-center">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto text-gray-500" />
+                <p className="mt-2 text-gray-600">読み込み中...</p>
+            </div>
+        </div>
+    )
+}
+
+export default function JoinPage() {
+    return (
+        <Suspense fallback={<LoadingFallback />}>
+            <JoinContent />
+        </Suspense>
     )
 }
