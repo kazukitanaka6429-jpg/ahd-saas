@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { saveShortStayRecord, deleteShortStayRecord } from '@/app/actions/short-stay'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -30,6 +30,12 @@ interface ShortStayGridProps {
     record?: ShortStayRecord | null // Optional for flexibility
     defaultRecords?: any[] // Kept for compatibility if passed
     date: string
+}
+
+// バリデーションエラーの型
+interface ShortStayValidationError {
+    field: string
+    message: string
 }
 
 export function ShortStayGrid({ residents, record: initialRecord, date }: ShortStayGridProps) {
@@ -55,6 +61,47 @@ export function ShortStayGrid({ residents, record: initialRecord, date }: ShortS
 
     const [isDeleting, setIsDeleting] = useState(false)
 
+    // バリデーションエラー状態
+    const [validationErrors, setValidationErrors] = useState<ShortStayValidationError[]>([])
+
+    // バリデーション関数
+    const runValidation = useCallback(() => {
+        if (!formData.resident_id) {
+            // 利用者未選択の場合はバリデーションエラーなし
+            setValidationErrors([])
+            return []
+        }
+
+        const errors: ShortStayValidationError[] = []
+
+        // 日中活動チェック（GH または 日中活動 のいずれかが必須）
+        const hasDaytimeActivity = formData.daytime_activity === 'true'
+        if (!formData.is_gh && !hasDaytimeActivity) {
+            // 3項目すべてにエラー
+            errors.push({ field: 'is_gh', message: 'GH または 日中活動 のいずれかは必須です。' })
+            errors.push({ field: 'daytime_activity', message: 'GH または 日中活動 のいずれかは必須です。' })
+            errors.push({ field: 'other_welfare_service', message: 'GH または 日中活動 のいずれかは必須です。' })
+        }
+
+        // 日中活動選択時は other_welfare_service が必須
+        if (hasDaytimeActivity && (!formData.other_welfare_service || formData.other_welfare_service.trim() === '')) {
+            errors.push({ field: 'other_welfare_service', message: '日中活動を選択した場合は、サービス内容の入力が必須です。' })
+        }
+
+        // 夜間チェック（GH泊が必須 - ショートステイは1項目のみ）
+        if (!formData.is_gh_night) {
+            errors.push({ field: 'is_gh_night', message: '夜間の状況（GH泊）は必須項目です。' })
+        }
+
+        setValidationErrors(errors)
+        return errors
+    }, [formData])
+
+    // formData変更時に自動バリデーション
+    useEffect(() => {
+        runValidation()
+    }, [formData, runValidation])
+
     // Findings State
     const [findingsPaths, setFindingsPaths] = useState<string[]>([])
     const [findingState, setFindingState] = useState<{
@@ -77,13 +124,25 @@ export function ShortStayGrid({ residents, record: initialRecord, date }: ShortS
         }
     }, [initialRecord])
 
-    // Register Save Function
+    // Register Save Function - 個別バリデーション・保存を実装
     useEffect(() => {
         const id = 'short-stay-grid'
         registerSaveNode(id, async () => {
-            if (!formData.resident_id) return // Skip empty
+            if (!formData.resident_id) return { savedCount: 0, failedCount: 0 } // Skip empty
 
-            // Silent save
+            // バリデーション実行
+            const errors = runValidation()
+            if (errors.length > 0) {
+                // エラーがある場合は保存しない
+                const resident = residents.find(r => r.id === formData.resident_id)
+                return {
+                    savedCount: 0,
+                    failedCount: 1,
+                    failedResidents: [resident?.name || 'ショートステイ利用者']
+                }
+            }
+
+            // バリデーション通過 - 保存実行
             const result = await saveShortStayRecord({
                 ...formData,
                 date: date
@@ -96,9 +155,13 @@ export function ShortStayGrid({ residents, record: initialRecord, date }: ShortS
             if (result.data) {
                 setFormData(prev => ({ ...prev, id: result.data.id }))
             }
+            return { savedCount: 1, failedCount: 0 }
         })
         return () => unregisterSaveNode(id)
-    }, [registerSaveNode, unregisterSaveNode, formData, date])
+    }, [registerSaveNode, unregisterSaveNode, formData, date, runValidation, residents])
+
+    // エラー判定ヘルパー
+    const hasError = (field: string) => validationErrors.some(e => e.field === field)
 
 
     const handleChange = (key: keyof ShortStayRecord, value: any) => {
@@ -169,9 +232,14 @@ export function ShortStayGrid({ residents, record: initialRecord, date }: ShortS
 
     const FindingCell = ({ colKey, children, className = "", label }: { colKey: string, children: React.ReactNode, className?: string, label: string }) => {
         const show = hasFinding(colKey)
+        const hasValidationError = hasError(colKey)
         return (
             <td
-                className={cn(cellBase, className)}
+                className={cn(
+                    cellBase,
+                    className,
+                    hasValidationError && "ring-2 ring-red-500 ring-inset bg-red-50"
+                )}
                 onContextMenu={(e) => handleContextMenu(e, colKey, label)}
             >
                 {children}

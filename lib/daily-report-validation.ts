@@ -77,6 +77,7 @@ export function validateDailyReport(
             (typeof data.daytime_activity === 'string' && data.daytime_activity.trim().length > 0)
 
         // A2a: Day Activity Required - At least one of GH or daytime_activity must be checked
+        // エラー時は GH, 日中活動, その他福祉サービス の3項目すべてにエラー表示
         if (!data.is_gh && !hasDaytimeActivity) {
             errors.push({
                 id: `A2a-daytime-${residentId}`,
@@ -90,6 +91,13 @@ export function validateDailyReport(
                 residentId,
                 residentName,
                 field: 'is_gh',
+                message: 'GH または 日中活動 のいずれかは必須です。'
+            })
+            errors.push({
+                id: `A2a-welfare-${residentId}`,
+                residentId,
+                residentName,
+                field: 'other_welfare_service',
                 message: 'GH または 日中活動 のいずれかは必須です。'
             })
         }
@@ -106,14 +114,36 @@ export function validateDailyReport(
         }
 
         // A3: Night Status Required - At least one of the night options must be checked
+        // エラー時は GH泊, 救急搬送, 入院, 外泊 の4項目すべてにエラー表示
         const hasNightStatus = data.is_gh_night || data.emergency_transport ||
             data.hospitalization_status || data.overnight_stay_status
         if (!hasNightStatus) {
             errors.push({
-                id: `A3-${residentId}`,
+                id: `A3-night-${residentId}`,
                 residentId,
                 residentName,
                 field: 'is_gh_night',
+                message: '夜間の状況（GH泊など）は必須項目です。'
+            })
+            errors.push({
+                id: `A3-emergency-${residentId}`,
+                residentId,
+                residentName,
+                field: 'emergency_transport',
+                message: '夜間の状況（GH泊など）は必須項目です。'
+            })
+            errors.push({
+                id: `A3-hospital-${residentId}`,
+                residentId,
+                residentName,
+                field: 'hospitalization_status',
+                message: '夜間の状況（GH泊など）は必須項目です。'
+            })
+            errors.push({
+                id: `A3-overnight-${residentId}`,
+                residentId,
+                residentName,
+                field: 'overnight_stay_status',
                 message: '夜間の状況（GH泊など）は必須項目です。'
             })
         }

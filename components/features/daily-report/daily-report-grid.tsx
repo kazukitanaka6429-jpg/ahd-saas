@@ -61,7 +61,7 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
         })
         setLocalData(map)
         setPendingChanges(new Map())
-        setValidationErrors([])
+        // バリデーションエラーはクリアしない（利用者がエラーを修正するまで表示を継続）
     }, [defaultRecords])
 
     // Validation function that returns current validation state
@@ -103,30 +103,88 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
         return () => unregisterValidation(id)
     }, [registerValidation, unregisterValidation, runValidation])
 
-    // Register Save Function
+    // localData変更時に自動でバリデーションを再実行
+    // これにより、UIでの入力変更やデータリロード時にエラー表示が更新される
+    useEffect(() => {
+        runValidation()
+    }, [localData, runValidation])
+
+    // Register Save Function - 個別バリデーション・保存を実装
     useEffect(() => {
         const id = 'daily-report-grid'
         registerSaveNode(id, async () => {
-            if (pendingChanges.size === 0) return
+            if (pendingChanges.size === 0) return { savedCount: 0, failedCount: 0 }
 
-            const recordsToSave = Array.from(pendingChanges.entries()).map(([residentId, changes]) => ({
-                resident_id: residentId,
-                date: date,
-                data: {}, // Not using data for these fields anymore, but keeping for compatibility if mixed
-                ...changes
-            }))
+            const nightStaffCount = getSharedState<number>('nightStaffCount') || 0
+            const nightShiftPlus = getSharedState<boolean>('nightShiftPlus') || false
 
-            const result = await upsertDailyRecordsBulk(recordsToSave)
-            if (result.error) {
-                console.error("Daily report save failed", result.error)
-                throw new Error(result.error)
+            // 個別にバリデーションして、保存可能なレコードを抽出
+            const recordsToSave: any[] = []
+            const failedResidents: string[] = []
+            const savedResidentIds: string[] = []
+
+            pendingChanges.forEach((changes, residentId) => {
+                const resident = residents.find(r => r.id === residentId)
+                const record = localData.get(residentId)
+                const data = record?.data || {}
+
+                // 個別バリデーション用のレコードを作成
+                const residentRecord = {
+                    residentId,
+                    residentName: resident?.name || '',
+                    data: {
+                        is_gh: (data as any)?.is_gh ?? record?.is_gh ?? changes?.is_gh ?? false,
+                        is_gh_night: (data as any)?.is_gh_night ?? record?.is_gh_night ?? changes?.is_gh_night ?? false,
+                        daytime_activity: (data as any)?.daytime_activity ?? record?.daytime_activity ?? changes?.daytime_activity ?? false,
+                        other_welfare_service: (data as any)?.other_welfare_service ?? record?.other_welfare_service ?? changes?.other_welfare_service ?? null,
+                        meal_lunch: (data as any)?.meal_lunch ?? record?.meal_lunch ?? changes?.meal_lunch ?? false,
+                        emergency_transport: (data as any)?.emergency_transport ?? record?.emergency_transport ?? changes?.emergency_transport ?? false,
+                        hospitalization_status: (data as any)?.hospitalization_status ?? record?.hospitalization_status ?? changes?.hospitalization_status ?? false,
+                        overnight_stay_status: (data as any)?.overnight_stay_status ?? record?.overnight_stay_status ?? changes?.overnight_stay_status ?? false,
+                    }
+                }
+
+                // この利用者だけをバリデーション
+                const result = validateDailyReport([residentRecord], nightStaffCount, nightShiftPlus)
+                // 施設レベルエラーは無視（個人エラーのみチェック）
+                const personalErrors = result.errors.filter(e => e.residentId === residentId)
+
+                if (personalErrors.length === 0) {
+                    recordsToSave.push({
+                        resident_id: residentId,
+                        date: date,
+                        data: {},
+                        ...changes
+                    })
+                    savedResidentIds.push(residentId)
+                } else {
+                    failedResidents.push(resident?.name || residentId)
+                }
+            })
+
+            // 保存可能なレコードのみ保存
+            if (recordsToSave.length > 0) {
+                const result = await upsertDailyRecordsBulk(recordsToSave)
+                if (result.error) {
+                    console.error("Daily report save failed", result.error)
+                    throw new Error(result.error)
+                }
+                // 保存成功したレコードだけpendingChangesから削除
+                setPendingChanges(prev => {
+                    const newMap = new Map(prev)
+                    savedResidentIds.forEach(id => newMap.delete(id))
+                    return newMap
+                })
             }
-            if (result.success) {
-                setPendingChanges(new Map())
+
+            return {
+                savedCount: recordsToSave.length,
+                failedCount: failedResidents.length,
+                failedResidents
             }
         })
         return () => unregisterSaveNode(id)
-    }, [registerSaveNode, unregisterSaveNode, pendingChanges, date])
+    }, [registerSaveNode, unregisterSaveNode, pendingChanges, date, residents, localData, getSharedState])
 
     const getValue = (residentId: string, key: keyof DailyRecord) => {
         const record = localData.get(residentId)

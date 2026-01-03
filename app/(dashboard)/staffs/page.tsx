@@ -7,7 +7,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table'
-import { CreateStaffDialog } from './create-dialog'
+import { StaffFormDialog } from './staff-form-dialog'
 import { InviteDialog } from './invite-dialog'
 import { InviteLinkButton } from './invite-link-button'
 import { StaffActions } from './staff-actions'
@@ -65,14 +65,14 @@ export default async function StaffsPage() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-2xl font-bold tracking-tight">職員管理</h2>
+                    <h2 className="text-2xl font-bold tracking-tight">職員マスタ</h2>
                     <p className="text-muted-foreground">
                         {staffs?.length || 0}名の職員が登録されています
                     </p>
                 </div>
                 <div className="flex gap-2">
                     <InviteDialog />
-                    <CreateStaffDialog />
+                    <StaffFormDialog currentStaff={staff} />
                 </div>
             </div>
 
@@ -95,38 +95,38 @@ export default async function StaffsPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {staffs?.map((staff: any) => (
-                                <TableRow key={staff.id}>
-                                    <TableCell className="font-medium sticky left-0 bg-white z-10">{staff.name}</TableCell>
-                                    <TableCell>{staff.facilities?.name || '-'}</TableCell>
-                                    <TableCell>{getRoleLabel(staff.role)}</TableCell>
-                                    <TableCell>{getStatusLabel(staff.status)}</TableCell>
+                            {staffs?.map((s: any) => (
+                                <TableRow key={s.id}>
+                                    <TableCell className="font-medium sticky left-0 bg-white z-10">{s.name}</TableCell>
+                                    <TableCell>{s.facilities?.name || '-'}</TableCell>
+                                    <TableCell>{getRoleLabel(s.role)}</TableCell>
+                                    <TableCell>{getStatusLabel(s.status)}</TableCell>
                                     <TableCell>
-                                        {staff.job_types?.map((job: string) => (
+                                        {s.job_types?.map((job: string) => (
                                             <Badge key={job} variant="outline" className="mr-1">{job}</Badge>
                                         ))}
                                     </TableCell>
-                                    <TableCell>{staff.qualifications || '-'}</TableCell>
-                                    <TableCell>{staff.join_date || '-'}</TableCell>
-                                    <TableCell>{staff.leave_date || '-'}</TableCell>
+                                    <TableCell>{s.qualifications || '-'}</TableCell>
+                                    <TableCell>{s.join_date || '-'}</TableCell>
+                                    <TableCell>{s.leave_date || '-'}</TableCell>
                                     <TableCell>
-                                        {new Date(staff.created_at).toLocaleDateString('ja-JP')}
+                                        {new Date(s.created_at).toLocaleDateString('ja-JP')}
                                     </TableCell>
                                     <TableCell>
-                                        {staff.auth_user_id ? (
+                                        {s.auth_user_id ? (
                                             <Badge variant="secondary" className="gap-1 bg-green-100 text-green-700">
                                                 <CheckCircle className="h-3 w-3" />
                                                 登録済み
                                             </Badge>
                                         ) : (
                                             <InviteLinkButton
-                                                staffId={staff.id}
-                                                staffName={staff.name}
+                                                staffId={s.id}
+                                                staffName={s.name}
                                             />
                                         )}
                                     </TableCell>
                                     <TableCell className="text-right sticky right-0 bg-white z-10 shadow-sm">
-                                        <StaffActions id={staff.id} name={staff.name} />
+                                        <StaffActions staff={s} currentStaff={staff} />
                                     </TableCell>
                                 </TableRow>
                             ))}

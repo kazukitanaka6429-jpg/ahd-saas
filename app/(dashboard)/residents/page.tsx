@@ -7,7 +7,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table'
-import { CreateResidentDialog } from './create-dialog'
+import { ResidentFormDialog } from './resident-form-dialog'
 import { ResidentActions } from './resident-actions'
 import { Resident } from '@/types'
 import { Badge } from '@/components/ui/badge'
@@ -57,12 +57,12 @@ export default async function ResidentsPage() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-2xl font-bold tracking-tight">利用者管理</h2>
+                    <h2 className="text-2xl font-bold tracking-tight">利用者マスタ</h2>
                     <p className="text-muted-foreground">
                         施設を利用する利用者の登録・編集を行います。
                     </p>
                 </div>
-                <CreateResidentDialog />
+                <ResidentFormDialog currentStaff={staff} />
             </div>
 
             <div className="rounded-md border bg-white overflow-hidden">
@@ -109,7 +109,7 @@ export default async function ResidentsPage() {
                                     <TableCell className="text-center">{getFlagLabel(resident.severe_disability_addition)}</TableCell>
                                     <TableCell className="text-center">{getFlagLabel(resident.sputum_suction)}</TableCell>
                                     <TableCell className="text-right sticky right-0 bg-white z-10 shadow-sm">
-                                        <ResidentActions id={resident.id} name={resident.name} />
+                                        <ResidentActions resident={resident} currentStaff={staff} />
                                     </TableCell>
                                 </TableRow>
                             ))}

@@ -1,7 +1,23 @@
-export type Facility = {
+export type Organization = {
     id: string
     name: string
     code: string
+    created_at: string
+}
+
+export type Qualification = {
+    id: string
+    name: string
+    is_medical_target: boolean
+    created_at: string
+}
+
+export type Facility = {
+    id: string
+    organization_id: string | null
+    name: string
+    code: string
+    provider_number: string | null
     settings: Record<string, any>
     created_at: string
     updated_at: string
@@ -10,14 +26,18 @@ export type Facility = {
 export type Staff = {
     id: string
     facility_id: string
+    qualification_id: string | null
     auth_user_id: string | null
     name: string
     role: 'admin' | 'manager' | 'staff'
     status: 'active' | 'retired'
+    email: string | null
+    invite_token: string | null
     join_date: string | null
     leave_date: string | null
     job_types: string[] | null
     qualifications: string | null
+    qualifications_text: string | null
     created_at: string
     updated_at: string
 }

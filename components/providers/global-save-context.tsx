@@ -73,7 +73,7 @@ export function GlobalSaveProvider({ children }: { children: React.ReactNode }) 
     const triggerGlobalSave = useCallback(async (skipWarnings = false): Promise<{ success: boolean; warnings?: any[] }> => {
         if (isSaving) return { success: false }
 
-        // Run all validations first
+        // Run all validations first (for UI update)
         let allErrors: any[] = []
         let allWarnings: any[] = []
 
@@ -83,24 +83,43 @@ export function GlobalSaveProvider({ children }: { children: React.ReactNode }) 
             allWarnings = [...allWarnings, ...result.warnings]
         })
 
-        // If there are blocking errors, don't save
-        if (allErrors.length > 0) {
-            toast.error(`${allErrors.length}件のエラーがあります。修正してください。`)
-            return { success: false }
-        }
-
         // If there are warnings and we're not skipping them, return warnings for UI to handle
         if (allWarnings.length > 0 && !skipWarnings) {
             return { success: false, warnings: allWarnings }
         }
 
-        // All validations passed (or warnings skipped), proceed with save
+        // Proceed with save - each node handles its own individual validation
+        // エラーがあっても保存を実行（各ノードが個別にバリデーション・保存を管理）
         setIsSaving(true)
         try {
             const promises = Array.from(saveNodes.values()).map(fn => fn())
-            await Promise.all(promises)
-            toast.success('全データを保存しました')
-            return { success: true }
+            const results = await Promise.all(promises)
+
+            // Collect results from nodes that return save stats
+            let totalSaved = 0
+            let totalFailed = 0
+            const failedNames: string[] = []
+
+            results.forEach(result => {
+                if (result && typeof result === 'object') {
+                    if (result.savedCount !== undefined) totalSaved += result.savedCount
+                    if (result.failedCount !== undefined) totalFailed += result.failedCount
+                    if (result.failedResidents) failedNames.push(...result.failedResidents)
+                }
+            })
+
+            // Show detailed toast message
+            if (totalSaved > 0 && totalFailed === 0) {
+                toast.success(`${totalSaved}件のデータを保存しました`)
+            } else if (totalSaved > 0 && totalFailed > 0) {
+                toast.warning(`${totalSaved}件保存成功、${totalFailed}件はエラーのため保存できませんでした（${failedNames.join('、')}）`)
+            } else if (totalSaved === 0 && totalFailed > 0) {
+                toast.error(`${totalFailed}件のエラーがあるため保存できませんでした。修正してください。`)
+            } else if (totalSaved === 0 && totalFailed === 0) {
+                toast.success('全データを保存しました')
+            }
+
+            return { success: totalFailed === 0 }
         } catch (error) {
             console.error("Global save error", error)
             toast.error('一部のデータの保存に失敗しました')
