@@ -46,8 +46,8 @@ export async function upsertStaff(formData: FormData) {
         status,
         join_date: joinDate,
         leave_date: leaveDate,
-        qualification_id: qualificationId,
-        qualifications_text: qualificationsText, // カラム名注意: qualifications -> qualifications_text? 元のSQL確認要 (staffsテーブルのカラムは qualifications_text だったはず)
+        // qualification_id: qualificationId, // DBにカラムがないため除外
+        qualifications: qualificationsText, // DBカラム名は qualifications
         job_types: jobTypes,
         updated_at: new Date().toISOString()
     }

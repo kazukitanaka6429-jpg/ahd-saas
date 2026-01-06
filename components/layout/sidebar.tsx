@@ -18,8 +18,11 @@ import {
     GraduationCap,
     Settings,
     Database,
-    ChevronDown
+    ChevronDown,
+    ArrowLeftRight,
+    Menu
 } from 'lucide-react'
+import { CreateNotificationModal } from '@/components/common/CreateNotificationModal'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -109,7 +112,7 @@ const ROLES = {
     STAFF: 'staff'
 } as const
 
-export function Sidebar({ role }: { role?: string }) {
+export function Sidebar({ role, facilityName, hasMultipleAccounts }: { role?: string, facilityName?: string, hasMultipleAccounts?: boolean }) {
     const pathname = usePathname()
     const router = useRouter()
     const supabase = createClient()
@@ -138,7 +141,19 @@ export function Sidebar({ role }: { role?: string }) {
         router.refresh()
     }
 
-    // 権限チェック関数
+    const handleSwitchFacility = () => {
+        router.push('/select-facility')
+    }
+
+
+
+    // 権限チェック関数 (omitted unchanged parts...)
+
+    if (!isMounted) {
+        return <div className="h-screen w-64 border-r bg-gray-50/40" />
+    }
+
+    // Reuse hasAccess logic from original file... 
     const hasAccess = (item: SidebarItem) => {
         // Admin only check
         if (item.adminOnly) {
@@ -151,10 +166,6 @@ export function Sidebar({ role }: { role?: string }) {
         return true
     }
 
-    if (!isMounted) {
-        return <div className="h-screen w-64 border-r bg-gray-50/40" />
-    }
-
     return (
         <div
             className={cn(
@@ -162,23 +173,40 @@ export function Sidebar({ role }: { role?: string }) {
                 isCollapsed ? "w-20 px-2" : "w-64 px-4"
             )}
         >
-            {/* Toggle Button */}
-            <Button
-                variant="ghost"
-                size="icon"
-                className="absolute -right-3 top-8 z-50 h-6 w-6 rounded-full border bg-white shadow-md hover:bg-gray-100"
-                onClick={toggleSidebar}
-            >
-                {isCollapsed ? <ChevronsRight className="h-3 w-3" /> : <ChevronsLeft className="h-3 w-3" />}
-            </Button>
+            <div className={cn("mb-6 flex flex-col gap-2 transition-all duration-300", isCollapsed ? "items-center px-0" : "px-2")}>
+                <div className="flex items-center justify-between w-full mb-2">
+                    {/* Toggle Button - Now static position */}
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 hover:bg-gray-100"
+                        onClick={toggleSidebar}
+                    >
+                        <Menu className="h-5 w-5 text-gray-600" />
+                    </Button>
+                </div>
 
-            <div className={cn("mb-8 flex items-center", isCollapsed ? "justify-center px-0" : "px-2")}>
-                <h1 className={cn("font-bold tracking-tight text-primary transition-all duration-300", isCollapsed ? "text-xs" : "text-xl")}>
-                    {isCollapsed ? "CS" : "Care SaaS"}
-                </h1>
-                {!isCollapsed && (
-                    <div className="ml-2 text-xs text-gray-400 border rounded px-1 whitespace-nowrap">
-                        {role === 'admin' ? '本社' : role === 'manager' ? '管理者' : '一般'}
+                <div className="flex items-center px-2">
+                    <h1 className={cn("font-bold tracking-tight text-primary transition-all duration-300", isCollapsed ? "hidden" : "text-xl")}>
+                        Care SaaS
+                    </h1>
+                    {!isCollapsed && (
+                        <div className="ml-2 text-xs text-gray-400 border rounded px-1 whitespace-nowrap">
+                            {role === 'admin' ? '本社' : role === 'manager' ? '管理者' : '一般'}
+                        </div>
+                    )}
+                </div>
+
+                {!isCollapsed && facilityName && (
+                    <div className="flex items-center justify-between text-sm text-gray-600 bg-white/50 p-2 rounded-md border border-dashed">
+                        <span className="truncate max-w-[120px]" title={facilityName}>
+                            {facilityName}
+                        </span>
+                        {hasMultipleAccounts && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleSwitchFacility} title="所属を切り替え">
+                                <ArrowLeftRight className="h-3 w-3" />
+                            </Button>
+                        )}
                     </div>
                 )}
             </div>
@@ -275,6 +303,17 @@ export function Sidebar({ role }: { role?: string }) {
                         </Link>
                     )
                 })}
+            </div>
+
+            <div className="px-3 py-2">
+                {/* 本社へ連絡ボタン (Admin以外) */}
+                {role !== ROLES.HQ && (
+                    <div className={cn("mb-2", isCollapsed ? "hidden" : "block")}>
+                        <div className="w-full">
+                            <CreateNotificationModal />
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div className="mt-auto border-t pt-4">

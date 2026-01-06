@@ -50,6 +50,10 @@ export function StaffFormDialog({ currentStaff, initialData, trigger, open: cont
     const jobTypesOptions = ['看護管理者', '看護', '介護管理者', 'サービス管理責任者', '介護']
     const [selectedJobTypes, setSelectedJobTypes] = useState<string[]>([])
 
+    // State for qualification selection
+    const [qualificationId, setQualificationId] = useState<string | undefined>(undefined)
+    const [qualificationKey, setQualificationKey] = useState(0)
+
     const isEdit = !!initialData
 
     // マスタデータの取得
@@ -93,6 +97,9 @@ export function StaffFormDialog({ currentStaff, initialData, trigger, open: cont
             } else {
                 setSelectedJobTypes([])
             }
+            // Initialize qualification
+            setQualificationId(initialData?.qualification_id)
+            setQualificationKey(prev => prev + 1) // Force re-render to ensure default value is respected or cleared
         }
     }, [open, currentStaff, initialData])
 
@@ -240,19 +247,39 @@ export function StaffFormDialog({ currentStaff, initialData, trigger, open: cont
 
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="qualification_id" className="text-right">資格</Label>
-                            <Select name="qualification_id" defaultValue={initialData?.qualification_id}>
-                                <SelectTrigger className="col-span-3">
-                                    <SelectValue placeholder="資格を選択" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {qualifications.map(q => (
-                                        <SelectItem key={q.id} value={q.id}>
-                                            {q.name}
-                                            {q.is_medical_target && <span className="ml-2 text-xs text-green-600">(対象)</span>}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <div className="col-span-3 flex gap-2">
+                                <Select
+                                    key={qualificationKey}
+                                    name="qualification_id"
+                                    value={qualificationId}
+                                    onValueChange={setQualificationId}
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="資格を選択" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {qualifications.map(q => (
+                                            <SelectItem key={q.id} value={q.id}>
+                                                {q.name}
+                                                {q.is_medical_target && <span className="ml-2 text-xs text-green-600">(対象)</span>}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => {
+                                        setQualificationId(undefined)
+                                        setQualificationKey(prev => prev + 1)
+                                    }}
+                                    title="選択解除"
+                                >
+                                    <span className="text-lg">×</span>
+                                </Button>
+                                <input type="hidden" name="qualification_id" value={qualificationId || ''} />
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-4 items-center gap-4">

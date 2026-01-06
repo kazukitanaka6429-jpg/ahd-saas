@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Staff } from '@/types'
+import { cookies } from 'next/headers'
 
 // Role definitions
 export const ROLES = {
@@ -19,26 +20,76 @@ export async function getCurrentStaff() {
         redirect('/login')
     }
 
-    // Find staff record linked to this auth user
-    const { data: staff } = await supabase
+    const cookieStore = await cookies()
+    const activeStaffId = cookieStore.get('active_staff_id')?.value
+
+    // If cookie exists, try to fetch that specific staff record
+    if (activeStaffId) {
+        const { data: staff } = await supabase
+            .from('staffs')
+            .select('*')
+            .eq('id', activeStaffId)
+            .eq('auth_user_id', user.id)
+            .single()
+
+        if (staff) {
+            return staff as Staff
+        }
+        // If cookie was invalid/stale (e.g. staff deleted), fall through to discovery logic
+    }
+
+    // Find all staff records linked to this auth user
+    const { data: staffs } = await supabase
         .from('staffs')
         .select('*')
         .eq('auth_user_id', user.id)
-        .single()
 
-    if (!staff) {
+    if (!staffs || staffs.length === 0) {
         return null
     }
 
-    return staff as Staff
+    if (staffs.length === 1) {
+        return staffs[0] as Staff
+    }
+
+    // Multiple records found and no valid cookie -> Redirect to selection
+    // Note: We should check if we are already on the selection page to avoid loop, 
+    // but getCurrentStaff is usually called by protected pages.
+    // The selection page itself should probably NOT call getCurrentStaff, or call a variant.
+    redirect('/select-facility')
 }
 
 export async function requireAuth() {
     const staff = await getCurrentStaff()
     if (!staff) {
+        // If null is returned (and not redirected inside), it means no staff record found.
+        // We might want to show a "Contact Admin" page or "Join" page.
+        // For now, redirect to login or show error?
+        // Existing logic returned null, callers usually handle it or crash.
+        // Let's stick to existing behavior for "no staff": return null.
         return null
     }
     return staff
+}
+
+// Helper to get ALL staff identities for the current user (for switching UI)
+export async function getMyStaffIdentities() {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) return []
+
+    const { data: staffs } = await supabase
+        .from('staffs')
+        .select(`
+            *,
+            facilities (
+                name
+            )
+        `)
+        .eq('auth_user_id', user.id)
+
+    return staffs || []
 }
 
 // Helper to check permissions

@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentStaff } from '@/lib/auth-helpers'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 
 /**
  * 招待リンクを生成（管理者用）
@@ -155,6 +156,21 @@ export async function signUpWithToken(token: string, email: string, password: st
     if (updateError) {
         return { error: `職員データの更新に失敗しました: ${updateError.message}` }
     }
+
+    // 4. セッション確立とCookie設定
+    // Note: createClient() in action normally handles session setting via cookie store,
+    // but explicit signIn might be safer if signUp behavior varies. 
+    // Usually signUp returns a session if email confirm is off.
+
+    // Set active_staff_id explicitly
+    const cookieStore = await cookies()
+    cookieStore.set('active_staff_id', staffId, {
+        path: '/',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7 // 1 week
+    })
 
     return {
         success: true,
