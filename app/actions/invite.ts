@@ -48,7 +48,14 @@ export async function generateInviteLink(staffId: string) {
     // 3. トークン生成・保存
     const token = crypto.randomUUID()
 
-    const supabaseAdmin = createAdminClient()
+    let supabaseAdmin;
+    try {
+        supabaseAdmin = createAdminClient()
+    } catch (e) {
+        console.error('Failed to create admin client:', e)
+        return { error: 'システムエラー: 環境変数設定(SUPABASE_SERVICE_ROLE_KEY)を確認してください' }
+    }
+
     const { error: updateError } = await supabaseAdmin
         .from('staffs')
         .update({ invite_token: token })
