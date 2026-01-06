@@ -16,27 +16,32 @@ export function InviteLinkButton({ staffId, staffName }: InviteLinkButtonProps) 
     const [copied, setCopied] = useState(false)
 
     const handleClick = async () => {
-        setLoading(true)
+        try {
+            setLoading(true)
 
-        const result = await generateInviteLink(staffId)
+            const result = await generateInviteLink(staffId)
 
-        setLoading(false)
+            if (result.error) {
+                toast.error(result.error)
+                return
+            }
 
-        if (result.error) {
-            toast.error(result.error)
-            return
-        }
+            if (result.success && result.url) {
+                // クリップボードにコピー
+                await navigator.clipboard.writeText(result.url)
+                setCopied(true)
+                toast.success(`${staffName} さんの招待リンクをコピーしました`, {
+                    description: 'LINEやSlackで本人に共有してください'
+                })
 
-        if (result.success && result.url) {
-            // クリップボードにコピー
-            await navigator.clipboard.writeText(result.url)
-            setCopied(true)
-            toast.success(`${staffName} さんの招待リンクをコピーしました`, {
-                description: 'LINEやSlackで本人に共有してください'
-            })
-
-            // 2秒後にアイコンを戻す
-            setTimeout(() => setCopied(false), 2000)
+                // 2秒後にアイコンを戻す
+                setTimeout(() => setCopied(false), 2000)
+            }
+        } catch (error) {
+            console.error(error)
+            toast.error('予期せぬエラーが発生しました')
+        } finally {
+            setLoading(false)
         }
     }
 

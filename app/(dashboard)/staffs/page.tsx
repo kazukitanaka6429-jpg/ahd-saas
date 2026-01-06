@@ -118,6 +118,17 @@ export default async function StaffsPage() {
                                                 <CheckCircle className="h-3 w-3" />
                                                 登録済み
                                             </Badge>
+                                        ) : s.invite_token ? (
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">
+                                                    招待済み
+                                                </Badge>
+                                                {/* 再発行可能にするためボタンも残すが、見た目を変える */}
+                                                <InviteLinkButton
+                                                    staffId={s.id}
+                                                    staffName={s.name}
+                                                />
+                                            </div>
                                         ) : (
                                             <InviteLinkButton
                                                 staffId={s.id}

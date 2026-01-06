@@ -5,9 +5,12 @@ import { getUnresolvedNotifications, getResolvedNotifications, resolveNotificati
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { DashboardFilter, FilterValues } from './DashboardFilter'
+import { getStaffListForFilter, SimpleStaff } from '@/app/actions/staffs'
+import { NotificationFilters } from '@/app/actions/notifications'
 import { CheckCircle2, AlertCircle, RefreshCw, History, Inbox } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 type GroupedNotifications = {
     [facilityName: string]: (FacilityNotification & { created_staff?: { name: string } | null, resolved_staff?: { name: string } | null })[]
@@ -16,44 +19,71 @@ type GroupedNotifications = {
 export function NotificationWidget() {
     const [notifications, setNotifications] = useState<(FacilityNotification & { created_staff?: { name: string } | null })[]>([])
     const [resolvedNotifications, setResolvedNotifications] = useState<(FacilityNotification & { created_staff?: { name: string } | null, resolved_staff?: { name: string } | null })[]>([])
+    const [staffList, setStaffList] = useState<SimpleStaff[]>([])
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState('inbox')
+
+    // Filter State
+    const [filters, setFilters] = useState<FilterValues>({
+        year: '',
+        month: '',
+        created_by: 'all',
+        resolved_by: 'all'
+    })
 
     const fetchNotifications = async () => {
         setLoading(true)
         const data = await getUnresolvedNotifications()
         setNotifications(data)
 
-        // Only fetch resolved if tab is active or just to have data ready? 
-        // Let's fetch resolved when needed or invalidating
         if (activeTab === 'history') {
-            await fetchResolved()
+            await fetchResolved(filters)
         }
 
         setLoading(false)
     }
 
-    const fetchResolved = async () => {
-        const data = await getResolvedNotifications()
+    const fetchResolved = async (currentFilters: FilterValues) => {
+        // Convert empty strings to undefined for API
+        const apiFilters: NotificationFilters = {
+            year: currentFilters.year || undefined,
+            month: currentFilters.month || undefined,
+            created_by: currentFilters.created_by,
+            resolved_by: currentFilters.resolved_by
+        }
+        const data = await getResolvedNotifications(apiFilters)
         setResolvedNotifications(data)
+    }
+
+    const loadStaffList = async () => {
+        const list = await getStaffListForFilter()
+        setStaffList(list)
     }
 
     useEffect(() => {
         fetchNotifications()
+        loadStaffList()
     }, [])
 
     useEffect(() => {
         if (activeTab === 'history') {
-            fetchResolved()
+            fetchResolved(filters)
         }
     }, [activeTab])
+
+    const handleFilterChange = (newFilters: FilterValues) => {
+        setFilters(newFilters)
+        if (activeTab === 'history') {
+            fetchResolved(newFilters)
+        }
+    }
 
     const handleResolve = async (id: string) => {
         const result = await resolveNotification(id)
         if (result.success) {
             setNotifications((prev) => prev.filter((n) => n.id !== id))
             // Refresh resolved list if switching to history later
-            fetchResolved()
+            fetchResolved(filters)
         } else {
             alert('エラーが発生しました')
         }
@@ -89,7 +119,7 @@ export function NotificationWidget() {
                 <h2 className="text-lg font-bold flex items-center gap-2">
                     施設からの連絡
                 </h2>
-                <Button variant="ghost" size="sm" onClick={() => { activeTab === 'inbox' ? fetchNotifications() : fetchResolved() }} disabled={loading}>
+                <Button variant="ghost" size="sm" onClick={() => { activeTab === 'inbox' ? fetchNotifications() : fetchResolved(filters) }} disabled={loading}>
                     <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
                     更新
                 </Button>
@@ -171,6 +201,12 @@ export function NotificationWidget() {
 
                 {/* HISTORY CONTENT */}
                 <TabsContent value="history" className="mt-0">
+                    <DashboardFilter
+                        onFilterChange={handleFilterChange}
+                        staffList={staffList}
+                        showResolvedBy={true}
+                    />
+
                     {resolvedNotifications.length === 0 ? (
                         <Card>
                             <CardContent>

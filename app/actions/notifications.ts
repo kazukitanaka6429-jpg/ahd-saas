@@ -125,7 +125,7 @@ export async function resolveNotification(id: string) {
     return { success: true }
 }
 
-export async function getFacilityNotifications() {
+export async function getFacilityNotifications(filters?: NotificationFilters) {
     const supabase = await createClient()
 
     // Get current staff (considering multi-tenancy)
@@ -135,7 +135,7 @@ export async function getFacilityNotifications() {
         return []
     }
 
-    const { data, error } = await supabase
+    let query = supabase
         .from('facility_notifications')
         .select(`
       *,
@@ -148,7 +148,29 @@ export async function getFacilityNotifications() {
     `)
         .eq('facility_id', staff.facility_id)
         .order('created_at', { ascending: false })
-        .limit(20)
+
+    if (filters) {
+        if (filters.year && filters.month) {
+            const startDate = `${filters.year}-${filters.month.padStart(2, '0')}-01`
+            const nextMonth = filters.month === '12' ? '01' : String(Number(filters.month) + 1).padStart(2, '0')
+            const nextYear = filters.month === '12' ? String(Number(filters.year) + 1) : filters.year
+            const endDate = `${nextYear}-${nextMonth}-01`
+
+            // For facility view, filtering by created_at makes more sense? Or resolved_at?
+            // Usually facility cares about when they SENT it.
+            query = query.gte('created_at', startDate).lt('created_at', endDate)
+        }
+        if (filters.created_by && filters.created_by !== 'all') {
+            query = query.eq('created_by', filters.created_by)
+        }
+        if (filters.resolved_by && filters.resolved_by !== 'all') {
+            query = query.eq('resolved_by', filters.resolved_by)
+        }
+    }
+
+    query = query.limit(50)
+
+    const { data, error } = await query
 
     if (error) {
         console.error('Error fetching facility notifications:', error)
@@ -159,10 +181,18 @@ export async function getFacilityNotifications() {
 }
 
 // HQ: Get resolved notifications history
-export async function getResolvedNotifications() {
+export type NotificationFilters = {
+    year?: string
+    month?: string
+    created_by?: string
+    resolved_by?: string
+}
+
+// HQ: Get resolved notifications history
+export async function getResolvedNotifications(filters?: NotificationFilters) {
     const supabase = await createClient()
 
-    const { data, error } = await supabase
+    let query = supabase
         .from('facility_notifications')
         .select(`
       *,
@@ -178,7 +208,28 @@ export async function getResolvedNotifications() {
     `)
         .eq('status', 'resolved')
         .order('resolved_at', { ascending: false })
-        .limit(50) // Limit to recent 50 for performance
+
+    if (filters) {
+        if (filters.year && filters.month) {
+            const startDate = `${filters.year}-${filters.month.padStart(2, '0')}-01`
+            // Calculate end date (start of next month)
+            const nextMonth = filters.month === '12' ? '01' : String(Number(filters.month) + 1).padStart(2, '0')
+            const nextYear = filters.month === '12' ? String(Number(filters.year) + 1) : filters.year
+            const endDate = `${nextYear}-${nextMonth}-01`
+
+            query = query.gte('resolved_at', startDate).lt('resolved_at', endDate)
+        }
+        if (filters.created_by && filters.created_by !== 'all') {
+            query = query.eq('created_by', filters.created_by)
+        }
+        if (filters.resolved_by && filters.resolved_by !== 'all') {
+            query = query.eq('resolved_by', filters.resolved_by)
+        }
+    }
+
+    query = query.limit(50) // Limit to recent 50 for performance
+
+    const { data, error } = await query
 
     if (error) {
         console.error('Error fetching resolved notifications:', error)

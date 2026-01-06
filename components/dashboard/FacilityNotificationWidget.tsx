@@ -1,41 +1,75 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getFacilityNotifications, FacilityNotification } from '@/app/actions/notifications'
+import { getFacilityNotifications, FacilityNotification, NotificationFilters } from '@/app/actions/notifications'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { AlertCircle, RefreshCw, CheckCircle2, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { DashboardFilter, FilterValues } from './DashboardFilter'
+import { getStaffListForFilter, SimpleStaff } from '@/app/actions/staffs'
 
 type ExtendedNotification = FacilityNotification & { resolved_staff?: { name: string } | null, created_staff?: { name: string } | null }
 
 export function FacilityNotificationWidget() {
     const [notifications, setNotifications] = useState<ExtendedNotification[]>([])
     const [loading, setLoading] = useState(true)
+    const [staffList, setStaffList] = useState<SimpleStaff[]>([])
+    const [filters, setFilters] = useState<FilterValues>({
+        year: '',
+        month: '',
+        created_by: 'all',
+        resolved_by: 'all'
+    })
 
-    const fetchNotifications = async () => {
+    const fetchNotifications = async (currentFilters: FilterValues = filters) => {
         setLoading(true)
-        const data = await getFacilityNotifications()
+        const apiFilters: NotificationFilters = {
+            year: currentFilters.year || undefined,
+            month: currentFilters.month || undefined,
+            created_by: currentFilters.created_by,
+            resolved_by: currentFilters.resolved_by
+        }
+        const data = await getFacilityNotifications(apiFilters)
         setNotifications(data)
         setLoading(false)
     }
 
+    const loadStaffList = async () => {
+        const list = await getStaffListForFilter()
+        setStaffList(list)
+    }
+
     useEffect(() => {
         fetchNotifications()
+        loadStaffList()
     }, [])
+
+    const handleFilterChange = (newFilters: FilterValues) => {
+        setFilters(newFilters)
+        fetchNotifications(newFilters)
+    }
 
     return (
         <Card>
-            <CardHeader className="py-3 px-4 flex flex-row items-center justify-between space-y-0">
-                <CardTitle className="text-lg font-bold flex items-center gap-2">
-                    送信済み連絡一覧
-                    <span className="text-xs font-normal text-gray-500 ml-2">本社の確認状況</span>
-                </CardTitle>
-                <Button variant="ghost" size="sm" onClick={fetchNotifications} disabled={loading}>
-                    <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
-                    更新
-                </Button>
+            <CardHeader className="py-3 px-4 flex flex-col space-y-4">
+                <div className="flex flex-row items-center justify-between">
+                    <CardTitle className="text-lg font-bold flex items-center gap-2">
+                        送信済み連絡一覧
+                        <span className="text-xs font-normal text-gray-500 ml-2">本社の確認状況</span>
+                    </CardTitle>
+                    <Button variant="ghost" size="sm" onClick={() => fetchNotifications(filters)} disabled={loading}>
+                        <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
+                        更新
+                    </Button>
+                </div>
+                <DashboardFilter
+                    onFilterChange={handleFilterChange}
+                    staffList={staffList}
+                    showResolvedBy={true}
+                    defaultFilters={filters}
+                />
             </CardHeader>
             <CardContent className="p-0">
                 {notifications.length === 0 ? (
