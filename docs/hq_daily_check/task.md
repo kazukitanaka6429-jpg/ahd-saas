@@ -1,30 +1,21 @@
-# Phase 3: 本社日次確認画面（HQ Daily Check）
+# 仕様監査タスク (Audit against REQUIREMENTS.md)
 
-## 1. 準備 (Preparation)
-- [x] 既存スキーマとコードベースの調査
-- [ ] 実装計画書 (`implementation_plan.md`) の作成
-- [ ] ユーザーへの計画承認依頼
+## 監査対象
+- [x] **1. 医療連携予実ロジック**
+  - 同日担当看護師の利用者数カウントロジック (IV 1/2/3) -> ✅ 実装完了 (IV 1/2/3動的判定追加)
+  - `qualifications.is_medical_target` の考慮 -> ✅ 実装完了
+- [x] **2. 業務日誌バリデーション**
+  - 夜勤職員数 < 4 で加配NG -> ✅ 実装済み
+  - 日中活動内容の必須チェック -> ✅ 実装済み
+  - 夜間状況の必須チェック -> ✅ 実装済み
+- [x] **3. Admin権限設計**
+  - 施設マスタ非依存 (facility_id is null) -> ✅ 実装済み
+  - 全データアクセス権限 -> ✅ 実装済み
 
-## 2. データベース実装 (Database)
-- [ ] `external_billing_imports` テーブル作成用マイグレーションファイルの作成
-- [ ] マイグレーションの適用（ローカル環境）
-
-## 3. バックエンド実装 (Server Actions)
-- [ ] CSVアップロードとパース処理 (`actions/import-billing-csv.ts`)
-- [ ] マトリクスデータ取得処理 (`actions/get-hq-daily-data.ts`)
-  - `daily_records` と `external_billing_imports` の結合
-  - 5行構造へのデータ整形
-
-## 4. フロントエンド実装 (UI/UX)
-- [ ] ページレイアウトの作成 (`app/(dashboard)/hq/daily/page.tsx`)
-- [ ] マトリクスコンポーネント (`components/hq/HqCheckMatrix.tsx`)
-  - [ ] Sticky Left, Sticky Right, Scrollable Center の構造実装
-  - [ ] 5行（朝食・昼食・夕食・日中・夜勤）のレンダリング
-  - [ ] クリックによるデータ修正機能
-  - [ ] 差分強調表示（赤色背景）
-- [ ] CSVインポートモーダル/ボタンの実装
-
-## 5. 検証 (Verification)
-- [ ] インポート機能のテスト
-- [ ] 表示崩れの確認（横スクロール、Sticky動作）
-- [ ] データ整合性の確認（SaaS vs CSV）
+## 確認済みファイル
+- `app/actions/medical-v/get-medical-v-data.ts`
+- `lib/daily-report-validation.ts`
+- `lib/auth-helpers.ts`
+- `app/actions/hq/get-hq-daily-data.ts`
+- `app/actions/medical-v/upsert-medical-v.ts`
+- `app/(dashboard)/medical-cooperation/actions.ts`

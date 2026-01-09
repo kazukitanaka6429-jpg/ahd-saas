@@ -12,7 +12,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { AlertTriangle } from 'lucide-react'
-import { ValidationWarning } from '@/lib/daily-report-validation'
+import { ValidationWarning } from '@/types'
 
 interface ValidationWarningModalProps {
     isOpen: boolean

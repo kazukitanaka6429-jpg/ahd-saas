@@ -39,10 +39,15 @@ export async function getCurrentStaff() {
     }
 
     // Find all staff records linked to this auth user
-    const { data: staffs } = await supabase
+    const { data: staffs, error } = await supabase
         .from('staffs')
         .select('*')
         .eq('auth_user_id', user.id)
+
+    if (error) {
+        console.error('[getCurrentStaff] DB Error:', error)
+        return null
+    }
 
     if (!staffs || staffs.length === 0) {
         return null
@@ -52,10 +57,17 @@ export async function getCurrentStaff() {
         return staffs[0] as Staff
     }
 
-    // Multiple records found and no valid cookie -> Redirect to selection
-    // Note: We should check if we are already on the selection page to avoid loop, 
-    // but getCurrentStaff is usually called by protected pages.
-    // The selection page itself should probably NOT call getCurrentStaff, or call a variant.
+    // Multiple records found.
+    // Optimization for SaaS: If one of them is the Organization Admin (facility_id is null, role is admin),
+    // prioritize returning that one implicitly unless a cookie overrides it.
+    // This allows the Admin to "log in" without hitting the selection screen immediately if they don't have a cookie.
+    // They will be "Global Admin" context.
+    const adminStaff = staffs.find(s => s.role === 'admin' && s.facility_id === null)
+    if (adminStaff) {
+        return adminStaff as Staff
+    }
+
+    // If no clear admin, and multiple specific facilities, redirect to select
     redirect('/select-facility')
 }
 

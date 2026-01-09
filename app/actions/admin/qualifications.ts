@@ -13,7 +13,7 @@ export async function getQualifications() {
     const { data, error } = await supabase
         .from('qualifications')
         .select('*')
-        .order('is_medical_target', { ascending: false })
+        .order('is_medical_coord_iv_target', { ascending: false })
         .order('name')
 
     if (error) {

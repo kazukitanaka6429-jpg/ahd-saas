@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition, useEffect } from 'react'
-import { ResidentMatrixData, HqMatrixRow } from '@/app/actions/hq/get-hq-daily-data'
+import { ResidentMatrixData, HqMatrixRow } from '@/types'
 import { upsertDailyRecordsBulk } from '@/app/(dashboard)/daily-reports/actions'
 import { upsertAndLogHqRecord } from '@/app/actions/hq/upsert-and-log'
 import { HqStayManagement } from '@/components/hq/hq-stay-management'

@@ -40,14 +40,15 @@ export function StaffAttendance({
     }
 
     const [dayShift, setDayShift] = useState<Staff[]>(getStaffsByIds((initialData?.day_staff_ids as any) || []))
-    const [eveningShift, setEveningShift] = useState<Staff[]>(getStaffsByIds((initialData?.evening_staff_ids as any) || []))
+    // evening_staff_ids is not in current schema - commenting out
+    // const [eveningShift, setEveningShift] = useState<Staff[]>(getStaffsByIds((initialData?.evening_staff_ids as any) || []))
     const [nightShift, setNightShift] = useState<Staff[]>(getStaffsByIds((initialData?.night_staff_ids as any) || []))
     const [nightShiftPlus, setNightShiftPlus] = useState(initialData?.night_shift_plus || false)
 
-    const handleSave = async (key: 'day_staff_ids' | 'evening_staff_ids' | 'night_staff_ids' | 'night_shift_plus', value: any) => {
+    const handleSave = async (key: 'day_staff_ids' | 'night_staff_ids' | 'night_shift_plus', value: any) => {
         // Optimistic update locally
         if (key === 'day_staff_ids') setDayShift(getStaffsByIds(value))
-        if (key === 'evening_staff_ids') setEveningShift(getStaffsByIds(value))
+        // if (key === 'evening_staff_ids') setEveningShift(getStaffsByIds(value))
         if (key === 'night_staff_ids') setNightShift(getStaffsByIds(value))
         if (key === 'night_shift_plus') setNightShiftPlus(value)
 
@@ -79,12 +80,14 @@ export function StaffAttendance({
                 selectedStaffs={dayShift}
                 onChange={(newStaffs) => handleSave('day_staff_ids', newStaffs.map(s => s.id))}
             />
+            {/* evening_staff_ids is not in current schema - commenting out
             <ShiftRow
                 label="夕勤"
                 allStaffs={staffs}
                 selectedStaffs={eveningShift}
                 onChange={(newStaffs) => handleSave('evening_staff_ids', newStaffs.map(s => s.id))}
             />
+            */}
             <div className="grid grid-cols-[100px_1fr]">
                 <div className="bg-green-100 p-2 text-sm font-bold flex items-center justify-center border-r">
                     夜勤

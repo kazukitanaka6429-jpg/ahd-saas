@@ -2,20 +2,28 @@
 
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react'
 import { toast } from 'sonner'
+import { ValidationError, ValidationWarning } from '@/types'
 
-type SaveFn = () => Promise<void | any>
-type ValidateFn = () => { isValid: boolean; errors: any[]; warnings: any[] }
+// Save result type for nodes that return stats
+interface SaveNodeResult {
+    savedCount?: number
+    failedCount?: number
+    failedResidents?: string[]
+}
+
+type SaveFn = () => Promise<void | SaveNodeResult>
+type ValidateFn = () => { isValid: boolean; errors: ValidationError[]; warnings: ValidationWarning[] }
 
 interface GlobalSaveContextType {
     registerSaveNode: (id: string, fn: SaveFn) => void
     unregisterSaveNode: (id: string) => void
     registerValidation: (id: string, fn: ValidateFn) => void
     unregisterValidation: (id: string) => void
-    triggerGlobalSave: (skipWarnings?: boolean) => Promise<{ success: boolean; warnings?: any[] }>
+    triggerGlobalSave: (skipWarnings?: boolean) => Promise<{ success: boolean; warnings?: ValidationWarning[] }>
     isSaving: boolean
     // Shared state for cross-component communication
-    sharedState: Record<string, any>
-    setSharedState: (key: string, value: any) => void
+    sharedState: Record<string, unknown>
+    setSharedState: (key: string, value: unknown) => void
     getSharedState: <T>(key: string) => T | undefined
 }
 
@@ -25,10 +33,10 @@ export function GlobalSaveProvider({ children }: { children: React.ReactNode }) 
     const [saveNodes, setSaveNodes] = useState<Map<string, SaveFn>>(new Map())
     const [validationNodes, setValidationNodes] = useState<Map<string, ValidateFn>>(new Map())
     const [isSaving, setIsSaving] = useState(false)
-    const [sharedState, setSharedStateMap] = useState<Record<string, any>>({})
+    const [sharedState, setSharedStateMap] = useState<Record<string, unknown>>({})
 
     // Use ref for warning callback to avoid re-renders
-    const warningCallbackRef = useRef<((warnings: any[]) => void) | null>(null)
+    const warningCallbackRef = useRef<((warnings: ValidationWarning[]) => void) | null>(null)
 
     const registerSaveNode = useCallback((id: string, fn: SaveFn) => {
         setSaveNodes(prev => {
@@ -62,7 +70,7 @@ export function GlobalSaveProvider({ children }: { children: React.ReactNode }) 
         })
     }, [])
 
-    const setSharedState = useCallback((key: string, value: any) => {
+    const setSharedState = useCallback((key: string, value: unknown) => {
         setSharedStateMap(prev => ({ ...prev, [key]: value }))
     }, [])
 
@@ -70,12 +78,12 @@ export function GlobalSaveProvider({ children }: { children: React.ReactNode }) 
         return sharedState[key] as T | undefined
     }, [sharedState])
 
-    const triggerGlobalSave = useCallback(async (skipWarnings = false): Promise<{ success: boolean; warnings?: any[] }> => {
+    const triggerGlobalSave = useCallback(async (skipWarnings = false): Promise<{ success: boolean; warnings?: ValidationWarning[] }> => {
         if (isSaving) return { success: false }
 
         // Run all validations first (for UI update)
-        let allErrors: any[] = []
-        let allWarnings: any[] = []
+        let allErrors: ValidationError[] = []
+        let allWarnings: ValidationWarning[] = []
 
         validationNodes.forEach((validateFn) => {
             const result = validateFn()

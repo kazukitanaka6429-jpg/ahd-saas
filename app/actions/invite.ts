@@ -88,7 +88,14 @@ export async function validateInviteToken(token: string) {
         return { error: '無効なリンクです' }
     }
 
-    const supabaseAdmin = createAdminClient()
+    let supabaseAdmin;
+    try {
+        supabaseAdmin = createAdminClient()
+    } catch (e) {
+        console.error('Failed to create admin client:', e)
+        return { error: 'システムエラー: 環境変数設定を確認してください' }
+    }
+
     const { data: staff, error } = await supabaseAdmin
         .from('staffs')
         .select('id, name, facility_id, auth_user_id')
@@ -150,7 +157,14 @@ export async function signUpWithToken(token: string, email: string, password: st
     }
 
     // 3. staffs テーブルを更新
-    const supabaseAdmin = createAdminClient()
+    let supabaseAdmin;
+    try {
+        supabaseAdmin = createAdminClient()
+    } catch (e) {
+        console.error('Failed to create admin client:', e)
+        return { error: 'システムエラー: 環境変数設定を確認してください' }
+    }
+
     const { error: updateError } = await supabaseAdmin
         .from('staffs')
         .update({

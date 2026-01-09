@@ -1,7 +1,7 @@
 'use client'
 
 import { Facility } from '@/types'
-import { deleteFacility } from '@/app/actions/admin/facilities'
+import { deleteFacility } from '@/app/actions/facility'
 import { FacilityForm } from './facility-form'
 import { Button } from '@/components/ui/button'
 import {

@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Plus, Loader2 } from 'lucide-react'
-import { upsertResident } from './actions'
+import { createResident, updateResident, ResidentInput } from '@/app/actions/resident'
 import { toast } from "sonner"
 import { createClient } from '@/lib/supabase/client'
 import { Facility } from '@/types'
@@ -50,7 +50,7 @@ export function ResidentFormDialog({ currentStaff, initialData, trigger, open: c
     useEffect(() => {
         const fetchFacilities = async () => {
             const supabase = createClient()
-            if (currentStaff?.role === 'admin' || currentStaff?.role === 'manager') {
+            if (currentStaff?.role === 'admin') {
                 const { data } = await supabase.from('facilities').select('*')
                 if (data) setFacilities(data)
             }
@@ -64,11 +64,39 @@ export function ResidentFormDialog({ currentStaff, initialData, trigger, open: c
         setError(null)
 
         const formData = new FormData(e.currentTarget)
-        if (initialData?.id) {
-            formData.append('id', initialData.id)
+
+        // Map form data to ResidentInput
+        const displayIdValue = formData.get('display_id') as string
+        const payload: ResidentInput = {
+            facility_id: formData.get('facility_id') as string || undefined,
+            display_id: displayIdValue ? parseInt(displayIdValue) : undefined,
+            name: formData.get('name') as string,
+            status: formData.get('status') as any,
+            care_level: formData.get('classification') as string || undefined, // UI uses classification
+            start_date: formData.get('start_date') as string || undefined,
+            // direct_debit_start_date removed as per schema
+            primary_insurance: formData.get('primary_insurance') as string || undefined,
+            limit_application_class: formData.get('limit_application_class') as string || undefined,
+            public_expense_1: formData.get('public_expense_1') as string || undefined,
+            public_expense_2: formData.get('public_expense_2') as string || undefined,
+
+            // Checkboxes
+            // formData.get('key') returns 'on' if checked, null if not.
+            // But Checkbox component might not send 'on'.
+            // Standard form submission behavior: unchecked checkboxes are not sent.
+            table_7: formData.get('table_7') === 'on',
+            table_8: formData.get('table_8') === 'on',
+            ventilator: formData.get('ventilator') === 'on',
+            severe_disability_addition: formData.get('severe_disability_addition') === 'on',
+            sputum_suction: formData.get('sputum_suction') === 'on',
         }
 
-        const result = await upsertResident(formData)
+        let result
+        if (isEdit && initialData?.id) {
+            result = await updateResident(initialData.id, payload)
+        } else {
+            result = await createResident(payload)
+        }
 
         if (result.error) {
             setError(result.error)
@@ -107,7 +135,7 @@ export function ResidentFormDialog({ currentStaff, initialData, trigger, open: c
                         )}
 
                         {/* 施設選択 (管理者のみ) */}
-                        {(currentStaff?.role === 'admin' || currentStaff?.role === 'manager') && (
+                        {currentStaff?.role === 'admin' && (
                             <div className="grid grid-cols-4 items-center gap-4 mb-4">
                                 <Label htmlFor="facility_id" className="text-right col-span-1">施設</Label>
                                 <Select name="facility_id" defaultValue={initialData?.facility_id || currentStaff?.facility_id}>
@@ -123,13 +151,25 @@ export function ResidentFormDialog({ currentStaff, initialData, trigger, open: c
                             </div>
                         )}
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-3 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="name">氏名</Label>
+                                <Label htmlFor="display_id">表示ID <span className="text-red-500">*</span></Label>
+                                <Input
+                                    id="display_id"
+                                    name="display_id"
+                                    type="number"
+                                    required
+                                    min={1}
+                                    placeholder="例: 101"
+                                    defaultValue={initialData?.display_id}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="name">氏名 <span className="text-red-500">*</span></Label>
                                 <Input id="name" name="name" required placeholder="例: 田中 トメ" defaultValue={initialData?.name} />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="start_date">入居日</Label>
+                                <Label htmlFor="start_date">入居日 <span className="text-red-500">*</span></Label>
                                 <Input id="start_date" name="start_date" type="date" required defaultValue={initialData?.start_date} />
                             </div>
                         </div>
@@ -198,9 +238,10 @@ export function ResidentFormDialog({ currentStaff, initialData, trigger, open: c
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
+                            {/* DB column is care_level, use classification name in UI */}
                             <div className="space-y-2">
                                 <Label htmlFor="classification">区分</Label>
-                                <Select name="classification" defaultValue={initialData?.classification || undefined}>
+                                <Select name="classification" defaultValue={initialData?.care_level || initialData?.classification || undefined}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="選択してください" />
                                     </SelectTrigger>
@@ -225,6 +266,7 @@ export function ResidentFormDialog({ currentStaff, initialData, trigger, open: c
                                         <SelectItem value="in_facility">入所中</SelectItem>
                                         <SelectItem value="hospitalized">入院中</SelectItem>
                                         <SelectItem value="home_stay">外泊中</SelectItem>
+                                        <SelectItem value="left">退去</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import {
     Table,
     TableBody,
@@ -9,40 +9,33 @@ import {
     TableHeader,
     TableRow
 } from '@/components/ui/table'
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { Resident, Staff, MedicalCooperationRecord } from '@/types'
-import { saveMedicalCooperationRecordsBulk } from '@/app/(dashboard)/medical-cooperation/actions'
+import { Resident, Staff } from '@/types'
+import { upsertMedicalCooperationRecordsBulk, MedicalCooperationMatrix, MedicalCooperationRow } from '@/app/actions/medical-cooperation'
 import { toast } from 'sonner'
 import { getDaysInMonth } from 'date-fns'
 import { Loader2, Save } from 'lucide-react'
 import { FindingSheet } from '../daily-report/finding-sheet'
 
 interface Props {
-    residents: Resident[]
+    matrix: MedicalCooperationMatrix
     nurses: Staff[]
-    records: MedicalCooperationRecord[]
     currentDate: string // YYYY-MM-DD
     findingsIndicators?: Record<string, string[]>
+    facilityId?: string
 }
 
-export function MedicalCooperationGrid({ residents, nurses, records, currentDate, findingsIndicators = {} }: Props) {
-    // Generate days for the selected month
+export function MedicalCooperationGrid({ matrix, nurses, currentDate, findingsIndicators = {}, facilityId }: Props) {
+    const { residents, rows } = matrix
     const dateObj = new Date(currentDate)
     const year = dateObj.getFullYear()
     const month = dateObj.getMonth()
     const daysCount = getDaysInMonth(dateObj)
     const days = Array.from({ length: daysCount }, (_, i) => i + 1)
 
-    // Local State for Optimistic UI
-    const [localRecords, setLocalRecords] = useState(records)
-    const [pendingChanges, setPendingChanges] = useState<Map<string, { residentId: string, date: string, staffId: string }>>(new Map())
+    // Local State
+    const [localRows, setLocalRows] = useState<MedicalCooperationRow[]>(rows)
+    const [pendingChanges, setPendingChanges] = useState<Map<string, { residentId: string, date: string, staffId: string | null }>>(new Map())
     const [isSaving, setIsSaving] = useState(false)
 
     // Finding State
@@ -53,51 +46,32 @@ export function MedicalCooperationGrid({ residents, nurses, records, currentDate
         label: string
     }>({ isOpen: false, recordId: null, jsonPath: null, label: '' })
 
-    // Sync records when props change (revalidation)
     useEffect(() => {
-        setLocalRecords(records)
+        setLocalRows(rows)
         setPendingChanges(new Map())
-    }, [records])
+    }, [rows])
 
-    // Helper to get record
-    const getRecord = (residentId: string, day: number) => {
-        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-        return localRecords.find(r => r.resident_id === residentId && r.date === dateStr)
-    }
-
-    const handleSelect = (residentId: string, day: number, staffId: string) => {
-        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    const handleSelect = (residentId: string, _day: number, dateStr: string, staffId: string) => {
         const finalStaffId = staffId === 'none' ? null : staffId
 
-        // 1. Optimistic Update
-        setLocalRecords(prev => {
-            const existingIndex = prev.findIndex(r => r.resident_id === residentId && r.date === dateStr)
-            if (existingIndex >= 0) {
-                const newRecords = [...prev]
-                if (finalStaffId) {
-                    newRecords[existingIndex] = { ...newRecords[existingIndex], staff_id: finalStaffId }
-                } else {
-                    newRecords[existingIndex] = { ...newRecords[existingIndex], staff_id: finalStaffId as string }
+        // Optimistic Update
+        setLocalRows(prev => prev.map(row => {
+            if (row.date === dateStr) {
+                return {
+                    ...row,
+                    records: {
+                        ...row.records,
+                        [residentId]: finalStaffId
+                    }
                 }
-                return newRecords
-            } else {
-                if (!finalStaffId) return prev
-                return [...prev, {
-                    id: 'temp-' + Date.now(),
-                    resident_id: residentId,
-                    date: dateStr,
-                    staff_id: finalStaffId,
-                    facility_id: '',
-                    created_at: '',
-                    updated_at: ''
-                }]
             }
-        })
+            return row
+        }))
 
-        // 2. Track Change
+        // Pending Change
         setPendingChanges(prev => {
             const newMap = new Map(prev)
-            newMap.set(`${residentId}:${dateStr}`, { residentId, date: dateStr, staffId: finalStaffId || '' })
+            newMap.set(`${residentId}:${dateStr}`, { residentId, date: dateStr, staffId: finalStaffId })
             return newMap
         })
     }
@@ -110,16 +84,12 @@ export function MedicalCooperationGrid({ residents, nurses, records, currentDate
 
         setIsSaving(true)
         try {
-            const recordsToSave = Array.from(pendingChanges.values()).map(c => ({
-                residentId: c.residentId,
-                date: c.date,
-                staffId: c.staffId || null
-            }))
-
-            const result = await saveMedicalCooperationRecordsBulk(recordsToSave)
+            const recordsToSave = Array.from(pendingChanges.values())
+            // Pass facilityId if provided (Admin case)
+            const result = await upsertMedicalCooperationRecordsBulk(recordsToSave, facilityId)
 
             if (result.error) {
-                toast.error('保存に失敗しました')
+                toast.error(`保存に失敗しました: ${result.error}`)
             } else {
                 toast.success('保存しました')
                 setPendingChanges(new Map())
@@ -131,30 +101,16 @@ export function MedicalCooperationGrid({ residents, nurses, records, currentDate
         }
     }
 
-    const handleContextMenu = (e: React.MouseEvent, recordId: string | undefined, label: string, dateStr: string) => {
-        e.preventDefault()
-
-        if (!recordId || recordId.startsWith('temp-')) {
-            toast.warning('まずはデータを保存してください（ID未発行のため指摘を追加できません）')
-            return
-        }
-
-        setFindingState({
-            isOpen: true,
-            recordId,
-            jsonPath: 'staff_assignment', // Fixed path for this cell
-            label: `${label} (${dateStr})`
-        })
-    }
-
-    const hasFinding = (recordId: string | undefined) => {
-        if (!recordId) return false
-        const paths = findingsIndicators[recordId]
-        return paths && paths.includes('staff_assignment')
+    // Helper to calculate nurse load from local state
+    const getNurseLoad = (dateStr: string, staffId: string | null) => {
+        if (!staffId) return 0
+        const row = localRows.find(r => r.date === dateStr)
+        if (!row) return 0
+        return Object.values(row.records).filter(id => id === staffId).length
     }
 
     return (
-        <div className="border rounded-md bg-white overflow-hidden flex flex-col h-full">
+        <div className="border rounded-md bg-white overflow-hidden flex flex-col h-full shadow-sm">
             <div className="bg-gray-50 border-b px-4 py-2 flex justify-between items-center h-14 shrink-0">
                 <div className="font-bold text-gray-700">医療連携記録</div>
                 <Button
@@ -176,13 +132,13 @@ export function MedicalCooperationGrid({ residents, nurses, records, currentDate
                 </Button>
             </div>
             <div className="overflow-auto flex-1">
-                <Table className="min-w-max border-collapse">
+                <Table className="min-w-max border-separate border-spacing-0">
                     <TableHeader className="sticky top-0 bg-gray-50 z-30 shadow-sm">
                         <TableRow>
-                            <TableHead className="w-[50px] min-w-[50px] bg-gray-50 sticky left-0 z-30 border-r text-center font-bold text-xs">No</TableHead>
-                            <TableHead className="w-[150px] min-w-[150px] bg-gray-50 sticky left-[50px] z-30 border-r text-center font-bold text-xs drop-shadow-md">利用者名</TableHead>
+                            <TableHead className="w-[50px] min-w-[50px] bg-gray-50 sticky left-0 z-30 border-r border-b text-center font-bold text-xs">No</TableHead>
+                            <TableHead className="w-[150px] min-w-[150px] bg-gray-50 sticky left-[50px] z-30 border-r border-b text-center font-bold text-xs drop-shadow-md">利用者名</TableHead>
                             {days.map(day => (
-                                <TableHead key={day} className={`w-[40px] min-w-[40px] text-center border-r p-0 h-8 text-xs ${[6, 0].includes(new Date(year, month, day).getDay()) ? 'bg-orange-50 text-orange-900' : ''}`}>
+                                <TableHead key={day} className={`w-[40px] min-w-[40px] text-center border-r border-b p-0 h-8 text-xs ${[6, 0].includes(new Date(year, month, day).getDay()) ? 'bg-orange-50 text-orange-900' : ''}`}>
                                     {day}
                                 </TableHead>
                             ))}
@@ -191,46 +147,38 @@ export function MedicalCooperationGrid({ residents, nurses, records, currentDate
                     <TableBody>
                         {residents.map((resident, index) => (
                             <TableRow key={resident.id} className="hover:bg-gray-50/50">
-                                <TableCell className="sticky left-0 bg-white z-20 border-r font-medium text-center text-xs">
+                                <TableCell className="sticky left-0 bg-white z-20 border-r border-b font-medium text-center text-xs">
                                     {index + 1}
                                 </TableCell>
-                                <TableCell className="sticky left-[50px] bg-white z-20 border-r font-medium text-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px] drop-shadow-sm">
+                                <TableCell className="sticky left-[50px] bg-white z-20 border-r border-b font-medium text-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px] drop-shadow-sm">
                                     {resident.name}
                                 </TableCell>
                                 {days.map(day => {
-                                    const record = getRecord(resident.id, day)
-                                    const showIndicator = hasFinding(record?.id)
-                                    const dateStr = `${month + 1}/${day}`
-                                    const fullDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                                    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                                    const row = localRows.find(r => r.date === dateStr)
+                                    const staffId = row?.records[resident.id] || null
 
-                                    // Calculate Nurse Load for this specific day and staff
-                                    // Count how many residents this staff is assigned to on this day
-                                    let nurseLoad = 0
-                                    if (record?.staff_id) {
-                                        nurseLoad = localRecords.filter(r => r.date === fullDateStr && r.staff_id === record.staff_id).length
-                                    }
+                                    // Nurse Load Calculation
+                                    const nurseLoad = getNurseLoad(dateStr, staffId)
 
-                                    // Determine Background Color based on Nurse Load
                                     let bgClass = 'bg-transparent'
-                                    if (record?.staff_id) {
-                                        if (nurseLoad === 2) bgClass = 'bg-cyan-100'
-                                        else if (nurseLoad >= 3) bgClass = 'bg-yellow-100'
-                                        // Count 1 remains transparent (white)
+                                    if (staffId) {
+                                        if (nurseLoad === 2) bgClass = 'bg-yellow-100'
+                                        else if (nurseLoad >= 3) bgClass = 'bg-blue-100'
                                     }
-                                    if (pendingChanges.has(`${resident.id}:${fullDateStr}`)) {
-                                        bgClass = 'bg-orange-200' // Pending change override
-                                    }
+
+                                    const isPending = pendingChanges.has(`${resident.id}:${dateStr}`)
 
                                     return (
                                         <TableCell
                                             key={day}
-                                            className={`p-0 border-r min-w-[40px] h-8 text-center padding-0 relative ${bgClass}`}
-                                            onContextMenu={(e) => handleContextMenu(e, record?.id, resident.name, dateStr)}
+                                            className={`p-0 border-r border-b min-w-[40px] h-8 text-center padding-0 relative ${bgClass} ${isPending ? 'ring-2 ring-orange-400 ring-inset' : ''}`}
+                                        // context menu later
                                         >
                                             <select
                                                 className={`h-8 w-full border-none shadow-none focus:ring-0 px-0 text-center text-xs bg-transparent cursor-pointer outline-none appearance-none`}
-                                                value={record?.staff_id || 'none'}
-                                                onChange={(e) => handleSelect(resident.id, day, e.target.value)}
+                                                value={staffId || 'none'}
+                                                onChange={(e) => handleSelect(resident.id, day, dateStr, e.target.value)}
                                             >
                                                 <option value="none" className="text-gray-400">-</option>
                                                 {nurses.map(nurse => (
@@ -239,9 +187,6 @@ export function MedicalCooperationGrid({ residents, nurses, records, currentDate
                                                     </option>
                                                 ))}
                                             </select>
-                                            {showIndicator && (
-                                                <div className="absolute top-0 right-0 w-0 h-0 border-t-[6px] border-r-[6px] border-t-red-500 border-r-transparent pointer-events-none" />
-                                            )}
                                         </TableCell>
                                     )
                                 })}
@@ -251,6 +196,7 @@ export function MedicalCooperationGrid({ residents, nurses, records, currentDate
                 </Table>
             </div>
 
+            {/* Finding Sheet omitted for brevity if unused here logic-wise or needs props */}
             <FindingSheet
                 isOpen={findingState.isOpen}
                 onClose={() => setFindingState(prev => ({ ...prev, isOpen: false }))}

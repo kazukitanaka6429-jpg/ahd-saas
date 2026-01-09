@@ -1,7 +1,27 @@
--- Medical Coordination V: Permission & Table Fixes
--- Revised to avoid "relation does not exist" errors
+-- Medical Coordination V: Complete Fix Script
+-- Handles VIEW/TABLE mismatch and ensures correct schema
 
--- 1. Create Tables FIRST (safely)
+-- Step 1: Drop any VIEWs that might have been incorrectly created
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'medical_coord_v_records' 
+        AND table_type = 'VIEW'
+    ) THEN
+        DROP VIEW medical_coord_v_records;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'medical_coord_v_daily' 
+        AND table_type = 'VIEW'
+    ) THEN
+        DROP VIEW medical_coord_v_daily CASCADE;
+    END IF;
+END $$;
+
+-- Step 2: Create Tables (if not exist)
 CREATE TABLE IF NOT EXISTS medical_coord_v_daily (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     facility_id UUID REFERENCES facilities(id) NOT NULL,
@@ -23,7 +43,19 @@ CREATE TABLE IF NOT EXISTS medical_coord_v_records (
     UNIQUE(medical_coord_v_daily_id, resident_id)
 );
 
--- 2. NOW we can safely drop policies on existing tables
+-- Step 3: Ensure is_executed column exists (for existing tables)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'medical_coord_v_records' 
+        AND column_name = 'is_executed'
+    ) THEN
+        ALTER TABLE medical_coord_v_records ADD COLUMN is_executed BOOLEAN DEFAULT false;
+    END IF;
+END $$;
+
+-- Step 4: Drop old policies
 DROP POLICY IF EXISTS "Enable read for authenticated users based on facility_id" ON medical_coord_v_daily;
 DROP POLICY IF EXISTS "Enable insert/update for authenticated users based on facility_id" ON medical_coord_v_daily;
 DROP POLICY IF EXISTS "Enable all for users based on facility_id" ON medical_coord_v_daily;
@@ -31,17 +63,17 @@ DROP POLICY IF EXISTS "Enable all for authenticated users" ON medical_coord_v_re
 DROP POLICY IF EXISTS "Medical V Daily Access" ON medical_coord_v_daily;
 DROP POLICY IF EXISTS "Medical V Records Access" ON medical_coord_v_records;
 
--- 3. Enable RLS
+-- Step 5: Enable RLS
 ALTER TABLE medical_coord_v_daily ENABLE ROW LEVEL SECURITY;
 ALTER TABLE medical_coord_v_records ENABLE ROW LEVEL SECURITY;
 
--- 4. Grant Permissions
+-- Step 6: Grant Permissions
 GRANT ALL ON medical_coord_v_daily TO authenticated;
 GRANT ALL ON medical_coord_v_records TO authenticated;
 GRANT ALL ON medical_coord_v_daily TO service_role;
 GRANT ALL ON medical_coord_v_records TO service_role;
 
--- 5. Define Policies
+-- Step 7: Create Policies
 CREATE POLICY "Medical V Daily Access"
 ON medical_coord_v_daily FOR ALL TO authenticated
 USING (

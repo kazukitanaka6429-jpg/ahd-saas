@@ -2,12 +2,13 @@
 
 import { Button } from '@/components/ui/button'
 import { Edit, Trash2, Loader2 } from 'lucide-react'
-import { deleteResident } from './actions'
+import { deleteResident } from '@/app/actions/resident'
 import { toast } from "sonner"
 import { useState } from 'react'
 import { ResidentFormDialog } from './resident-form-dialog'
+import { Resident } from '@/types'
 
-export function ResidentActions({ resident, currentStaff }: { resident: any; currentStaff: any }) {
+export function ResidentActions({ resident, currentStaff }: { resident: Resident; currentStaff: any }) {
     const [loading, setLoading] = useState(false)
     const [editOpen, setEditOpen] = useState(false)
 

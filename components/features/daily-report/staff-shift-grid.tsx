@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { Staff, DailyShift } from '@/types'
-import { saveDailyShift } from '@/app/(dashboard)/daily-reports/actions'
+import { upsertDailyShift } from '@/app/actions/shift'
 import { toast } from 'sonner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -21,7 +21,6 @@ export function StaffShiftGrid({ staffs, initialData, date }: StaffShiftGridProp
 
     const [shiftData, setShiftData] = useState<Partial<DailyShift>>(initialData || {
         day_staff_ids: [],
-        evening_staff_ids: [],
         night_staff_ids: [],
         night_shift_plus: false
     })
@@ -43,11 +42,10 @@ export function StaffShiftGrid({ staffs, initialData, date }: StaffShiftGridProp
             const payload = {
                 ...shiftData,
                 day_staff_ids: cleanArray(shiftData.day_staff_ids as any[]),
-                evening_staff_ids: cleanArray(shiftData.evening_staff_ids as any[]),
                 night_staff_ids: cleanArray(shiftData.night_staff_ids as any[]),
             }
 
-            const result = await saveDailyShift(date, payload)
+            const result = await upsertDailyShift(date, payload)
             if (result?.error) {
                 console.error("Shift save failed", result.error)
                 throw new Error("Shift save failed")

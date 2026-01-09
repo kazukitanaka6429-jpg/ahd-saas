@@ -1,9 +1,8 @@
 import { getMedicalVData } from '@/app/actions/medical-v/get-medical-v-data'
-import { MedicalVTable } from '@/components/medical-v/medical-v-table'
+import { MedicalVGrid } from '@/components/features/medical-v/medical-v-grid'
 import { MonthSelector } from '@/components/medical-v/month-selector'
 
-import { format } from 'date-fns'
-import { ja } from 'date-fns/locale'
+import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,14 +15,25 @@ export default async function MedicalVPage({
     const today = new Date()
     const year = sp.year ? parseInt(sp.year as string) : today.getFullYear()
     const month = sp.month ? parseInt(sp.month as string) : today.getMonth() + 1
+    const facilityId = (sp.facility_id as string) || undefined
 
-    // Construct a date string for the selector (1st of month)
-    const dateStr = `${year}-${String(month).padStart(2, '0')}-01`
+    const data = await getMedicalVData(year, month, facilityId)
+    const { residents, rows, targetCount } = data
 
-    const { residents, rows, targetCount } = await getMedicalVData(year, month)
+    // Verify facility Logic (Reuse from before or rely on action)
+    // The action `getMedicalVData` already validates and returns data.
+    // If residents exist, we infer facilityId was valid.
 
-    // Calculate Monthly Total Units
-    const totalUnits = rows.reduce((sum, r) => sum + r.calculated_units, 0)
+    // We strictly need facilityId for the Grid for updates.
+    // Ideally pass the one resolved by action?
+    // The action doesn't return resolved ID explicitly but we can infer from residents[0].facility_id if needed.
+    // Or simpler: Use the same logic here or trust the param if admin provided.
+
+    let resolvedFacilityId = facilityId
+    // If admin and no param, action selected first.
+    if (!resolvedFacilityId && residents.length > 0) {
+        resolvedFacilityId = residents[0].facility_id
+    }
 
     return (
         <div className="space-y-6 pt-6 pb-20 px-6 max-w-[100vw] overflow-hidden">
@@ -37,28 +47,18 @@ export default async function MedicalVPage({
                     </p>
                 </div>
                 <div className="flex items-center gap-4">
-                    {/* Summary Cards */}
-                    <div className="bg-red-50 border border-red-200 rounded-md p-2 flex flex-col items-center min-w-[120px]">
-                        <span className="text-xs text-red-600 font-bold">喀痰吸引対象者数</span>
-                        <span className="text-xl font-bold text-red-700">{targetCount}名</span>
-                    </div>
-                    <div className="bg-blue-50 border border-blue-200 rounded-md p-2 flex flex-col items-center min-w-[120px]">
-                        <span className="text-xs text-blue-600 font-bold">月間合計単位数</span>
-                        <span className="text-xl font-bold text-blue-700">{totalUnits.toLocaleString()}</span>
-                    </div>
-
                     <div className="flex flex-col items-end gap-1">
                         <MonthSelector year={year} month={month} />
                     </div>
                 </div>
             </div>
 
-            <MedicalVTable
-                data={rows}
+            <MedicalVGrid
                 residents={residents}
+                rows={rows}
                 targetCount={targetCount}
-                year={year}
-                month={month}
+                currentDate={`${year}-${String(month).padStart(2, '0')}-01`}
+                facilityId={resolvedFacilityId}
             />
         </div>
     )

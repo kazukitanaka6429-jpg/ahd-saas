@@ -30,7 +30,7 @@ import { Loader2, Plus } from 'lucide-react'
 const formSchema = z.object({
     id: z.string().optional(),
     name: z.string().min(1, '資格名は必須です'),
-    is_medical_target: z.boolean().default(false),
+    is_medical_coord_iv_target: z.boolean().default(false),
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -50,7 +50,7 @@ export function QualificationForm({ initialData, trigger, onSuccess }: Qualifica
         defaultValues: {
             id: initialData?.id,
             name: initialData?.name || '',
-            is_medical_target: initialData?.is_medical_target || false,
+            is_medical_coord_iv_target: initialData?.is_medical_coord_iv_target || false,
         },
     })
 
@@ -96,7 +96,7 @@ export function QualificationForm({ initialData, trigger, onSuccess }: Qualifica
                         />
                         <FormField
                             control={form.control}
-                            name="is_medical_target"
+                            name="is_medical_coord_iv_target"
                             render={({ field }) => (
                                 <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
                                     <FormControl>
@@ -107,10 +107,10 @@ export function QualificationForm({ initialData, trigger, onSuccess }: Qualifica
                                     </FormControl>
                                     <div className="space-y-1 leading-none">
                                         <FormLabel>
-                                            医療連携加算の対象資格とする
+                                            医療連携Ⅳ加算の対象資格とする
                                         </FormLabel>
                                         <p className="text-sm text-muted-foreground">
-                                            看護師・准看護師の場合にチェックしてください
+                                            正看護師・准看護師の場合にチェックしてください
                                         </p>
                                     </div>
                                 </FormItem>

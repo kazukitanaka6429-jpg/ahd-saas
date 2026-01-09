@@ -30,6 +30,7 @@ interface ShortStayGridProps {
     record?: ShortStayRecord | null // Optional for flexibility
     defaultRecords?: any[] // Kept for compatibility if passed
     date: string
+    facilityId: string
 }
 
 // バリデーションエラーの型
@@ -38,7 +39,7 @@ interface ShortStayValidationError {
     message: string
 }
 
-export function ShortStayGrid({ residents, record: initialRecord, date }: ShortStayGridProps) {
+export function ShortStayGrid({ residents, record: initialRecord, date, facilityId }: ShortStayGridProps) {
     const { registerSaveNode, unregisterSaveNode, triggerGlobalSave, isSaving: isGlobalSaving } = useGlobalSave()
 
     // Local state

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { FacilitySwitcher } from '@/components/common/facility-switcher'
 import {
     LayoutDashboard,
     Building2,
@@ -197,16 +198,11 @@ export function Sidebar({ role, facilityName, hasMultipleAccounts }: { role?: st
                     )}
                 </div>
 
-                {!isCollapsed && facilityName && (
+                {!isCollapsed && (
                     <div className="flex items-center justify-between text-sm text-gray-600 bg-white/50 p-2 rounded-md border border-dashed">
-                        <span className="truncate max-w-[120px]" title={facilityName}>
-                            {facilityName}
-                        </span>
-                        {hasMultipleAccounts && (
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleSwitchFacility} title="所属を切り替え">
-                                <ArrowLeftRight className="h-3 w-3" />
-                            </Button>
-                        )}
+                        <div className="w-full">
+                            <FacilitySwitcher />
+                        </div>
                     </div>
                 )}
             </div>

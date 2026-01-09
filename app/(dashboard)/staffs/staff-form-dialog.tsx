@@ -21,7 +21,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { Plus, Loader2 } from 'lucide-react'
-import { upsertStaff } from './actions'
+import { createStaff, updateStaff } from '@/app/actions/staff'
 import { toast } from "sonner"
 import { createClient } from '@/lib/supabase/client'
 import { Facility, Qualification } from '@/types'
@@ -71,7 +71,7 @@ export function StaffFormDialog({ currentStaff, initialData, trigger, open: cont
             const { data: qualsData } = await supabase
                 .from('qualifications')
                 .select('*')
-                .order('is_medical_target', { ascending: false })
+                .order('is_medical_coord_iv_target', { ascending: false })
                 .order('name')
             if (qualsData) setQualifications(qualsData as Qualification[])
         }
@@ -115,24 +115,27 @@ export function StaffFormDialog({ currentStaff, initialData, trigger, open: cont
         setError(null)
 
         const formData = new FormData(e.currentTarget)
-        if (initialData?.id) {
-            formData.append('id', initialData.id)
+        const name = formData.get('name') as string
+        const role = formData.get('role') as 'admin' | 'manager' | 'staff'
+        const facilityId = formData.get('facility_id') as string || null
+
+        // Qualification ID logic handled by state 'qualificationId'
+        // Job Types handled by state 'selectedJobTypes'
+
+        const payload = {
+            name,
+            role,
+            facility_id: facilityId,
+            qualification_id: qualificationId || null,
+            job_types: selectedJobTypes,
         }
 
-        // 資格テキストをセット (互換性のため)
-        const qualId = formData.get('qualification_id') as string
-        if (qualId) {
-            const selectedQual = qualifications.find(q => q.id === qualId)
-            if (selectedQual) {
-                formData.set('qualifications_text', selectedQual.name)
-            }
+        let result
+        if (isEdit) {
+            result = await updateStaff(initialData.id, payload)
+        } else {
+            result = await createStaff(payload)
         }
-
-        // Manually append array data
-        formData.delete('job_types')
-        formData.append('job_types', JSON.stringify(selectedJobTypes))
-
-        const result = await upsertStaff(formData)
 
         if (result.error) {
             setError(result.error)
@@ -261,7 +264,7 @@ export function StaffFormDialog({ currentStaff, initialData, trigger, open: cont
                                         {qualifications.map(q => (
                                             <SelectItem key={q.id} value={q.id}>
                                                 {q.name}
-                                                {q.is_medical_target && <span className="ml-2 text-xs text-green-600">(対象)</span>}
+                                                {q.is_medical_coord_iv_target && <span className="ml-2 text-xs text-green-600">(対象)</span>}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>

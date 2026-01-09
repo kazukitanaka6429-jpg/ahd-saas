@@ -169,10 +169,30 @@ export async function upsertDailyRecordsBulk(records: {
     is_gh_night?: boolean
     is_gh_stay?: boolean
     emergency_transport?: boolean
-}[]) {
+}[], facilityIdOverride?: string) {
     const staff = await getCurrentStaff()
     if (!staff) throw new Error('Unauthorized')
-    const facilityId = staff.facility_id
+
+    // 管理者の場合はfacility_idがnullなので、オーバーライドまたはresidentから取得
+    let facilityId = staff.facility_id || facilityIdOverride
+
+    // facility_idがない場合は、residentテーブルから取得
+    if (!facilityId && records.length > 0) {
+        const supabaseForLookup = await createClient()
+        const { data: resident } = await supabaseForLookup
+            .from('residents')
+            .select('facility_id')
+            .eq('id', records[0].resident_id)
+            .single()
+
+        if (resident?.facility_id) {
+            facilityId = resident.facility_id
+        }
+    }
+
+    if (!facilityId) {
+        return { error: '施設IDが取得できませんでした' }
+    }
 
     const supabase = await createClient()
 

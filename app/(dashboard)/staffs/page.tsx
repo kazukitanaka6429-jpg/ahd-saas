@@ -11,32 +11,48 @@ import { StaffFormDialog } from './staff-form-dialog'
 import { InviteDialog } from './invite-dialog'
 import { InviteLinkButton } from './invite-link-button'
 import { StaffActions } from './staff-actions'
-import { Staff } from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { CheckCircle } from 'lucide-react'
-
-import { requireAuth, isHQ, canAccessMaster } from '@/lib/auth-helpers'
+import { getCurrentStaff } from '@/app/actions/auth'
+import { redirect } from 'next/navigation'
 
 export default async function StaffsPage() {
-    const staff = await requireAuth()
-    if (!staff) return <div className="p-8">職員アカウントが見つかりません。</div>
+    const staff = await getCurrentStaff()
+    if (!staff) redirect('/login')
+
+    const isHQ = staff.role === 'admin'
+    const isManager = staff.role === 'manager'
 
     // General Staff cannot access this page
-    if (!canAccessMaster(staff.role)) {
+    if (!isHQ && !isManager) {
         return <div className="p-8 text-red-500">このページにアクセスする権限がありません。</div>
     }
 
-    const facilityId = staff.facility_id
-    const isSuperAdmin = isHQ(staff.role)
-
     const supabase = await createClient()
+
+    // Fetch Staffs with Facility and Qualification names
+    // RLS will apply, but let's filter explicitly for clarity/performance logic if needed.
+    // Admin sees filtered by their org_id typically implicitly via RLS.
+
+    // Note: 'qualifications' here refers to the TABLE relation, not the old text column.
+    // Supabase TS types might need 'qualifications!left(name)' or similar hint if using joining.
+    // Assuming simple left join works.
     let query = supabase
         .from('staffs')
-        .select('*, facilities(name)')
+        .select(`
+            *,
+            facilities ( name ),
+            qualifications ( name )
+        `)
         .order('created_at', { ascending: false })
 
-    if (!isSuperAdmin) {
-        query = query.eq('facility_id', facilityId)
+    if (!isHQ) {
+        // Manager sees only own facility (redundant if RLS works, but safe)
+        if (staff.facility_id) {
+            query = query.eq('facility_id', staff.facility_id)
+        }
+    } else {
+        // Admin: Show all in Org (RLS handles this)
     }
 
     const { data: staffs, error } = await query
@@ -98,7 +114,7 @@ export default async function StaffsPage() {
                             {staffs?.map((s: any) => (
                                 <TableRow key={s.id}>
                                     <TableCell className="font-medium sticky left-0 bg-white z-10">{s.name}</TableCell>
-                                    <TableCell>{s.facilities?.name || '-'}</TableCell>
+                                    <TableCell>{(s.facilities as any)?.name || '-'}</TableCell>
                                     <TableCell>{getRoleLabel(s.role)}</TableCell>
                                     <TableCell>{getStatusLabel(s.status)}</TableCell>
                                     <TableCell>
@@ -106,7 +122,16 @@ export default async function StaffsPage() {
                                             <Badge key={job} variant="outline" className="mr-1">{job}</Badge>
                                         ))}
                                     </TableCell>
-                                    <TableCell>{s.qualifications || '-'}</TableCell>
+                                    <TableCell>
+                                        {s.qualifications ? (
+                                            <span className="font-medium">{(s.qualifications as any).name}</span>
+                                        ) : (
+                                            <span className="text-gray-400">-</span>
+                                        )}
+                                        {s.qualifications_text && (
+                                            <span className="text-xs text-gray-500 ml-1">({s.qualifications_text})</span>
+                                        )}
+                                    </TableCell>
                                     <TableCell>{s.join_date || '-'}</TableCell>
                                     <TableCell>{s.leave_date || '-'}</TableCell>
                                     <TableCell>
@@ -123,7 +148,6 @@ export default async function StaffsPage() {
                                                 <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">
                                                     招待済み
                                                 </Badge>
-                                                {/* 再発行可能にするためボタンも残すが、見た目を変える */}
                                                 <InviteLinkButton
                                                     staffId={s.id}
                                                     staffName={s.name}

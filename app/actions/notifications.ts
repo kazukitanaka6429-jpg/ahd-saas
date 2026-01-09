@@ -21,6 +21,16 @@ export type FacilityNotification = {
     } | null
 }
 
+// Extended types for joined queries
+export type NotificationWithCreatedStaff = FacilityNotification & {
+    created_staff?: { name: string } | null
+}
+
+export type NotificationWithStaff = FacilityNotification & {
+    created_staff?: { name: string } | null
+    resolved_staff?: { name: string } | null
+}
+
 export type GroupedNotifications = {
     [facilityName: string]: FacilityNotification[]
 }
@@ -31,21 +41,21 @@ export async function createNotification(formData: FormData) {
     // Get current user
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-        return { error: 'Unauthorized' }
+        return { error: '認証が必要です' }
     }
 
     // Get current staff (considering multi-tenancy)
     const staff = await getCurrentStaff()
 
     if (!staff || !staff.facility_id) {
-        return { error: 'Facility not found for user' }
+        return { error: '施設情報が見つかりません' }
     }
 
     const content = formData.get('content') as string
     const priority = formData.get('priority') as Priority || 'normal'
 
     if (!content) {
-        return { error: 'Content is required' }
+        return { error: '内容を入力してください' }
     }
 
     const { error } = await supabase
@@ -60,7 +70,7 @@ export async function createNotification(formData: FormData) {
 
     if (error) {
         console.error('Error creating notification:', error)
-        return { error: `Failed to create notification: ${error.message} (${error.code})` }
+        return { error: `通知の作成に失敗しました: ${error.message}` }
     }
 
     revalidatePath('/')
@@ -89,7 +99,8 @@ export async function getUnresolvedNotifications() {
         return []
     }
 
-    return data as unknown as (FacilityNotification & { created_staff?: { name: string } | null })[]
+    // Supabase returns typed data based on select query
+    return (data ?? []) as NotificationWithCreatedStaff[]
 }
 
 export async function resolveNotification(id: string) {
@@ -118,7 +129,7 @@ export async function resolveNotification(id: string) {
 
     if (error) {
         console.error('Error resolving notification:', error)
-        return { error: 'Failed to resolve notification' }
+        return { error: '通知の解決に失敗しました' }
     }
 
     revalidatePath('/')
@@ -177,7 +188,7 @@ export async function getFacilityNotifications(filters?: NotificationFilters) {
         return []
     }
 
-    return data as unknown as (FacilityNotification & { resolved_staff?: { name: string } | null, created_staff?: { name: string } | null })[]
+    return (data ?? []) as NotificationWithStaff[]
 }
 
 // HQ: Get resolved notifications history
@@ -236,5 +247,5 @@ export async function getResolvedNotifications(filters?: NotificationFilters) {
         return []
     }
 
-    return data as unknown as (FacilityNotification & { created_staff?: { name: string } | null, resolved_staff?: { name: string } | null })[]
+    return (data ?? []) as NotificationWithStaff[]
 }

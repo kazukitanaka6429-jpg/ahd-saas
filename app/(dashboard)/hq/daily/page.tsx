@@ -59,7 +59,7 @@ export default async function HqDailyPage({ searchParams }: { searchParams: Prom
 
             <div className="flex flex-col gap-4">
                 <BillingImporter
-                    facilityId={staff.facility_id}
+                    facilityId={staff.facility_id || ''}
                     date={new Date(year, month - 1, 1)}
                     onSuccess={async () => {
                         'use server'

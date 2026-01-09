@@ -51,7 +51,7 @@ export function QualificationsGrid({ data }: { data: Qualification[] }) {
                             <TableRow key={item.id}>
                                 <TableCell className="font-medium">{item.name}</TableCell>
                                 <TableCell>
-                                    {item.is_medical_target && (
+                                    {item.is_medical_coord_iv_target && (
                                         <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                                             対象
                                         </Badge>

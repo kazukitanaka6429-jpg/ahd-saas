@@ -45,7 +45,15 @@ export async function addFindingComment(
 
     const supabase = await createClient()
 
-    const payload: any = {
+    const payload: {
+        json_path: string
+        comment: string
+        author_name: string
+        is_resolved: boolean
+        daily_record_id?: string
+        medical_record_id?: string
+        short_stay_record_id?: string
+    } = {
         json_path: jsonPath,
         comment: content,
         author_name: staff.name,
@@ -117,7 +125,7 @@ export async function getFindingsCountByRecord(
 
     if (!records || records.length === 0) return {}
 
-    const ids = records.map((r: any) => r.id)
+    const ids = records.map((r) => r.id)
 
     // Step 2: Get findings
     let query = supabase
@@ -188,7 +196,7 @@ export async function getFindingsCountByRange(
 
     if (!records || records.length === 0) return {}
 
-    const ids = records.map((r: any) => r.id)
+    const ids = records.map((r) => r.id)
 
     // Step 2: Get findings
     let query = supabase

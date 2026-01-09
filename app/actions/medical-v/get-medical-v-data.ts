@@ -23,12 +23,47 @@ export type MedicalVData = {
     records: Record<string, boolean> // resident_id -> is_executed
 }
 
-export async function getMedicalVData(year: number, month: number) {
+export async function getMedicalVData(year: number, month: number, facilityIdArg?: string) {
     const staff = await getCurrentStaff()
     if (!staff) throw new Error('Unauthorized')
-    const facilityId = staff.facility_id
 
     const supabase = await createClient()
+    let facilityId = staff.facility_id
+
+    // SaaS Logic: Admin check
+    if (staff.role === 'admin' && staff.facility_id === null) {
+        if (facilityIdArg) {
+            // Security: Check Org Membership
+            const { data: facil } = await supabase.from('facilities').select('organization_id').eq('id', facilityIdArg).single()
+
+            if (!facil || facil.organization_id !== staff.organization_id) {
+                throw new Error('Unauthorized Facility Access')
+            }
+
+            facilityId = facilityIdArg
+        } else {
+            // SERVER-SIDE: Auto-select first facility for Admin
+            const { data: facilities } = await supabase
+                .from('facilities')
+                .select('id')
+                .eq('organization_id', staff.organization_id)
+                .limit(1)
+
+            if (facilities && facilities.length > 0) {
+                facilityId = facilities[0].id
+            } else {
+                return { residents: [], rows: [], targetCount: 0 }
+            }
+        }
+    } else {
+        // Staff/Manager validation
+        if (facilityIdArg && facilityIdArg !== staff.facility_id) {
+            console.warn('Unauthorized facility access attempt by staff')
+        }
+        facilityId = staff.facility_id
+    }
+
+    if (!facilityId) throw new Error('Facility ID missing')
 
     // 1. Calculate Date Range (String based to avoid timezone shift)
     const startDateStr = `${year}-${String(month).padStart(2, '0')}-01`
@@ -46,7 +81,7 @@ export async function getMedicalVData(year: number, month: number) {
         .select('*')
         .eq('facility_id', facilityId)
         .eq('status', 'in_facility')
-        .order('name')
+        .order('display_id', { ascending: true, nullsFirst: false })
 
     if (!residents) return { residents: [], rows: [], targetCount: 0 }
 

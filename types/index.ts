@@ -1,80 +1,65 @@
-export type Organization = {
-    id: string
-    name: string
-    code: string
-    created_at: string
+import { Database } from './database'
+
+// Database Aliases
+export type DbTables = Database['public']['Tables']
+export type DbEnums = Database['public']['Enums']
+
+export type Organization = DbTables['organizations']['Row']
+export type Facility = DbTables['facilities']['Row']
+export type Qualification = DbTables['qualifications']['Row']
+
+export type Staff = DbTables['staffs']['Row'] & {
+    // UI Helpers (Optional joins)
+    qualification_name?: string
 }
 
-export type Qualification = {
-    id: string
-    name: string
-    is_medical_target: boolean
-    created_at: string
+export type Resident = DbTables['residents']['Row']
+
+// Daily Record (with Typed Data JSONB)
+export interface DailyRecordData {
+    daytime_activity?: string | boolean | null
+    other_welfare_service?: string | null
+
+    // Meals
+    meal_breakfast?: boolean
+    meal_lunch?: boolean
+    meal_dinner?: boolean
+
+    // Status Flags
+    is_gh?: boolean
+    is_gh_night?: boolean
+    is_gh_stay?: boolean
+    emergency_transport?: boolean
+    hospitalization_status?: boolean
+    overnight_stay_status?: boolean
+
+    // Vitals
+    temp?: number
+    bp_systolic?: number
+    bp_diastolic?: number
+    pulse?: number
+    spo2?: number
+
+    // Care
+    care_notes?: string
+
+    // Medical Manual Override
+    medical_manual_level?: number | null // 1, 2, 3
 }
 
-export type Facility = {
-    id: string
-    organization_id: string | null
-    name: string
-    code: string
-    provider_number: string | null
-    settings: Record<string, any>
-    created_at: string
-    updated_at: string
-}
+export type DailyRecord = DbTables['daily_records']['Row'] & {
+    data: DailyRecordData
+} & Partial<DailyRecordData> // Allow top-level access to data fields for convenience
 
-export type Staff = {
-    id: string
-    facility_id: string
-    qualification_id: string | null
-    auth_user_id: string | null
-    name: string
-    role: 'admin' | 'manager' | 'staff'
-    status: 'active' | 'retired'
-    email: string | null
-    invite_token: string | null
-    join_date: string | null
-    leave_date: string | null
-    job_types: string[] | null
-    qualifications: string | null
-    qualifications_text: string | null
-    created_at: string
-    updated_at: string
-}
+export type MedicalCooperationRecord = DbTables['medical_cooperation_records']['Row']
+export type ShortStayRecord = DbTables['short_stay_records']['Row']
+export type ExternalBillingImport = DbTables['external_billing_imports']['Row']
 
-export type Resident = {
-    id: string
-    facility_id: string
-    name: string
-    care_level: string | null
-    status: 'in_facility' | 'hospitalized' | 'home_stay'
-    start_date: string
-    direct_debit_start_date: string | null
-    primary_insurance: string | null
-    limit_application_class: string | null
-    public_expense_1: string | null
-    public_expense_2: string | null
-    table_7: boolean
-    table_8: boolean
-    ventilator: boolean
-    classification: string | null
-    severe_disability_addition: boolean
-    sputum_suction: boolean
-    created_at: string
-    updated_at: string
-}
+// Custom Types for App Logic
+export type DailyShift = DbTables['daily_shifts']['Row']
 
-export type FeedbackComment = {
-    id: string
-    report_date: string
-    facility_id: string
-    content: string
-    author_name: string
-    is_resolved: boolean
-    created_at: string
-}
-
-export type FindingComment = {
+// Finding Comments (for daily records, medical records, short stay records)
+export interface FindingComment {
     id: string
     daily_record_id?: string
     medical_record_id?: string
@@ -88,102 +73,65 @@ export type FindingComment = {
     updated_at: string
 }
 
-export type ShortStayRecord = {
+// Feedback Comments (for daily report feedback)
+export interface FeedbackComment {
     id: string
-    facility_id: string
-    date: string
-    resident_id: string | null
-    period_note: string | null
-    meal_breakfast: boolean
-    meal_lunch: boolean
-    meal_dinner: boolean
-    meal_provided_lunch: boolean
-    is_gh: boolean
-    is_gh_night: boolean
-    daytime_activity: string | null
-    other_welfare_service: string | null
-    entry_time: string | null
-    exit_time: string | null
+    record_id: string
+    author_id: string
+    author_name: string
+    content: string
+    is_resolved: boolean
     created_at: string
-    updated_at: string
 }
 
-export type DailyShift = {
+// Validation Types
+export interface ValidationError {
     id: string
-    facility_id: string
-    date: string
-    day_staff_ids: string[]
-    evening_staff_ids: string[]
-    night_staff_ids: string[]
-    night_shift_plus: boolean
-    created_at: string
-    updated_at: string
+    residentId: string
+    residentName: string
+    field: string
+    message: string
 }
 
-export type ReportEntry = {
+export interface ValidationWarning {
     id: string
-    facility_id: string
-    date: string
-    resident_id: string
-    measurement_time: string | null
-    blood_pressure_systolic: number | null
-    blood_pressure_diastolic: number | null
-    pulse: number | null
-    temperature: number | null
-    meal_morning: number | null
-    meal_lunch: number | null
-    meal_dinner: number | null
-    medication_morning: string | null
-    medication_lunch: string | null
-    medication_dinner: string | null
-    bath_type: string | null
-    bowel_movement_count: string | null
-    urination_count: string | null
-    created_at: string
-    updated_at: string
+    residentId: string
+    residentName: string
+    field: string
+    message: string
 }
 
-export type MedicalCooperationRecord = {
-    id: string
-    facility_id: string
-    resident_id: string
-    staff_id: string | null
-    date: string
-    created_at: string
-    updated_at: string
+export interface ValidationResult {
+    errors: ValidationError[]
+    warnings: ValidationWarning[]
+    isValid: boolean
 }
 
-export type DailyRecord = {
-    id: string
-    facility_id: string
-    resident_id: string
-    date: string
-    hospitalization_status: boolean
-    overnight_stay_status: boolean
-    meal_breakfast: boolean
-    meal_lunch: boolean
-    meal_dinner: boolean
-    is_gh: boolean
-    daytime_activity: string | null // Changed to string for flexibility
-    other_welfare_service: string | null
-    is_gh_night: boolean
-    is_gh_stay: boolean // Added
-    emergency_transport: boolean
-    data: Record<string, any> // JSONB
-    created_at: string
-    updated_at: string
+// HQ Matrix Types
+export type HqMatrixRow = {
+    key: string
+    label: string
+    dailyValues: boolean[]
+    saasCount: number
+    csvCount: number
+    status: 'match' | 'mismatch' | 'no_data'
 }
 
+export type ResidentMatrixData = {
+    resident: Resident
+    rows: HqMatrixRow[]
+}
+// Stay Management Types
 export type StayPeriod = {
-    start: string | null; // MM/DD
-    end: string | null;   // MM/DD
-    type: 'hospitalization' | 'overnight';
-};
+    start: string | null
+    end: string | null
+    type: 'hospitalization' | 'overnight_stay' | 'overnight'
+}
 
 export type ResidentStayData = {
-    residentName: string;
-    residentId: string;
-    facilityName: string;
-    enrollmentDays: number; // 在籍日数
-    periods: StayPeriod[]; // 最大10件
-};
+    residentId: string
+    residentName: string
+    facilityName: string
+    enrollmentDays: number
+    periods: (StayPeriod | null)[]
+}

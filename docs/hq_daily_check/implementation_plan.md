@@ -1,83 +1,46 @@
-# Phase 3: 本社日次確認画面（HQ Daily Check）実装計画
+# 実装計画: 医療連携IV ロジック修正
 
-## 概要
-各拠点の管理者が月末に確認する「現場入力データと請求用CSVの突合・監査機能」を実装します。
-SaaSに入力された日次記録（食事、日中活動、夜間支援）と、外部請求ソフトからインポートしたCSVデータをマトリクス形式で比較し、差異を可視化します。
+## 目的
+`REQUIREMENTS.md` に定義された正しい医療連携IV (1/2/3) の判定ロジックを `get-hq-daily-data.ts` に実装する。また、資格 (`is_medical_target`) によるフィルタリングも追加する。
 
-## ユーザーレビューが必要な事項
-- **夜勤加配の定義**: SaaS上の `is_gh_night` (GH泊) を「夜勤加配」として扱います。
-- **CSVフォーマット**: ユーザー提示の画像 (`image_288961.png`) に基づき、B列(利用者名)、AB列(項目名)、AD列(数量) を使用します。文字コードはShift-JISまたはUTF-8を想定（Win環境ならShift-JISの可能性大ですが、現状はUTF-8前提で実装し、必要ならエンコーディング対応を追加）。
+## 現状の課題
+- レコードがあれば一律 "IV 1" と判定されている。
+- 看護師の資格有無が考慮されていない。
+- 同日担当数による区分の変化 (1名→IV1, 2名→IV2, 3名以上→IV3) が実装されていない。
 
-## 変更内容 (Proposed Changes)
+## 実装詳細
 
-### データベース (Database)
+### 1. データ取得の強化 (`get-hq-daily-data.ts`)
 
-#### [NEW] `supabase/migrations/20250101000009_hq_daily_check.sql`
-- `external_billing_imports` テーブルを追加
-  - `id`: UUID (PK)
-  - `facility_id`: UUID (FK)
-  - `target_month`: DATE (対象月 1日)
-  - `resident_name`: TEXT
-  - `item_name`: TEXT
-  - `quantity`: INTEGER
-  - `amount`: INTEGER
-  - `created_at`: TIMESTAMP
-  - `UNIQUE(facility_id, target_month, resident_name, item_name)`
+以下のデータを追加取得する:
+- **Qualifications**: `is_medical_target = true` の資格IDリスト
+- **Staffs**: 関連するスタッフの `qualification_id`
+- **Medical Records**: 対象月の全 `medical_cooperation_records` (resident_id, staff_id, date)
 
-### バックエンド (Server Actions)
+### 2. ロジックフロー
 
-#### [NEW] `app/actions/hq/import-billing-csv.ts`
-- `importBillingCsv(formData: FormData)`: CSVファイルをパースし、`external_billing_imports` にUpsertする。
-- 既存データを同月・同施設で洗い替え（またはOn Conflict Update）。
+1. **資格判定マップ作成**:
+   - `TargetQualificationIds`: Set<string>
+   - `MedicalStaffMap`: Map<string, boolean> (StaffId -> isTarget)
 
-#### [NEW] `app/actions/hq/get-hq-daily-data.ts`
-- `getHqDailyData(facilityId, year, month)`:
-  - `residents` 取得
-  - `daily_records` 取得 (指定月)
-  - `external_billing_imports` 取得 (指定月)
-  - データを結合し、利用者ごとの5行データを生成して返す。
+2. **日次スタッフ負荷マップ作成 (`DailyStaffLoadMap`)**:
+   - 構造: `Record<DateString, Record<StaffId, ResidentCount>>`
+   - 全レコードを走査し、`MedicalStaffMap` が true のスタッフについて、日ごとの担当利用者数をカウントする。
 
-### フロントエンド (UI/UX)
+3. **マトリクス値計算 (`getDailyValues`)**:
+   - 各日付・利用者について、担当スタッフID (`staff_id`) を特定。
+   - スタッフが `MedicalStaffMap` に含まれていない場合 -> **対象外 (false)**
+   - 含まれている場合、`DailyStaffLoadMap` からその日の担当数 (`count`) を取得。
+   - 判定:
+     - `medical_iv_1`: count === 1
+     - `medical_iv_2`: count === 2
+     - `medical_iv_3`: count >= 3
 
-#### [NEW] `app/(dashboard)/hq/daily/page.tsx`
-- ページレイアウト。年/月選択、施設選択（必要であれば）、CSVインポートボタン、マトリクス表示。
+## 変更ファイル
 
-#### [NEW] `components/hq/billing-importer.tsx`
-- CSVファイル選択とアップロード実行用コンポーネント。
+- `app/actions/hq/get-hq-daily-data.ts`
 
-#### [NEW] `components/hq/hq-check-matrix.tsx`
-- `TanStack Table` またはCSS Grid/Flexを用いたマトリクス実装。
-- **Sticky Layout**:
-  - Left: 利用者情報、項目名
-  - Center: 1日〜31日 (横スクロール)
-  - Right: SaaS計、CSV計、判定
-- **行構成 (5 Rows)**:
-  1. 朝食 (`bg-blue-50`) -> `meal_breakfast`
-  2. 昼食 (`bg-orange-50`) -> `meal_lunch`
-  3. 夕食 (`bg-red-50`) -> `meal_dinner`
-  4. 日中活動 (`bg-green-50`) -> `daytime_activity`
-  5. 夜勤加配 (`bg-purple-50`) -> `is_gh_night`
-- **インタラクション**:
-  - セルクリックで `daily_records` を直接更新 (Server Action呼び出し)。
-  - 数量不一致の場合、判定列を赤背景 (`bg-red-500`)・白文字で表示。
+## 検証プラン
 
-## 検証計画 (Verification Plan)
-
-### 自動テスト (Automated Tests)
-- 現状、E2Eテスト環境がないため、手動検証を主とします。
-
-### 手動検証 (Manual Verification)
-1. **マイグレーション適用**:
-   - `supabase db push` (またはローカル環境での適用) が成功すること。
-2. **CSVインポート**:
-   - サンプルCSVを作成し、アップロード。DBに正しく格納されることを確認。
-   - 重複データ投入時、エラーにならず更新されること。
-3. **画面表示**:
-   - `/hq/daily` にアクセス。
-   - 左・右カラムが固定され、中央のみスクロールすること。
-   - 5つの行が正しい色で表示されること。
-4. **データ連携**:
-   - 日付セルをクリックし、チェックON/OFFが切り替わること。
-   - チェックONの数と「SaaS数量」が一致すること。
-   - CSVデータがある場合、「CSV数量」に表示されること。
-   - 数量不一致時、「判定」が赤くなること。
+- 既存のデータに対し、意図的に複数の利用者を同じ看護師に割り当て、IV 1 -> 2 -> 3 と変化することを確認する。
+- 資格のないスタッフを割り当てた場合、IV判定がつかないことを確認する。

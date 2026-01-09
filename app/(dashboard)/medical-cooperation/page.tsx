@@ -11,6 +11,8 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic'
 
+import { getMedicalCooperationMatrix } from '@/app/actions/medical-cooperation'
+
 export default async function MedicalCooperationPage({
     searchParams,
 }: {
@@ -20,41 +22,44 @@ export default async function MedicalCooperationPage({
     const sp = await searchParams
     if (!staff) return <div className="p-8">権限がありません</div>
 
-    // Check master access? Wait, Manager/HQ can access. General cannot.
-    // requireAuth returns staff object. Sidebar filters link. But page should also protect.
-    // Assuming requireAuth is basic. 
-    // We should check role if we want strict security.
     if (staff.role === 'staff') {
         return <div className="p-8">この機能を利用する権限がありません</div>
     }
 
-    const facilityId = staff.facility_id
     const supabase = await createClient()
 
+    // For Admins (facility_id is NULL), auto-select first available
+    const facilityIdFromUrl = typeof sp.facility_id === 'string' ? sp.facility_id : undefined
+    let facilityId = staff.facility_id || facilityIdFromUrl
+
+    // SERVER-SIDE: If Admin with no facility selected, auto-select first available
+    if (!facilityId && staff.role === 'admin' && staff.organization_id) {
+        const { data: facilities } = await supabase
+            .from('facilities')
+            .select('id')
+            .eq('organization_id', staff.organization_id)
+            .limit(1)
+
+        if (facilities && facilities.length > 0) {
+            facilityId = facilities[0].id
+        }
+    }
+
+    if (!facilityId) {
+        return <div className="p-8">施設を選択してください。</div>
+    }
+
     // Handle Month selection (YYYY-MM)
-    // Default to current month's first day
     const now = new Date()
     const currentMonth = sp.month as string || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-    const startDate = `${currentMonth}-01`
+    const [yearStr, monthStr] = currentMonth.split('-')
+    const year = parseInt(yearStr)
+    const month = parseInt(monthStr)
 
-    // Calculate end date of month for query
-    // Actually simplicity: query records >= startDate AND record < nextMonth
-    // Or just filter by string match on date if we fetch all? No.
-    // DB date is YYYY-MM-DD.
+    // Fetch Matrix
+    const matrix = await getMedicalCooperationMatrix(year, month, facilityId)
 
-    // Fetch Residents (In Facility)
-    const { data: residents } = await supabase
-        .from('residents')
-        .select('*')
-        .eq('facility_id', facilityId)
-        .eq('status', 'in_facility')
-        .order('name')
-
-    // Fetch Nurses (Staffs with qualification)
-    // "qualfications" column is text. We look for '看護師' or '准看護師'.
-    // Supabase filter 'ilike' or 'cs' (contains) if it's array? 
-    // It is defined as "string | null" in types.
-    // Let's use ilike '%看護師%' which covers both 看護師 and 准看護師
+    // Fetch Nurses
     const { data: nurses } = await supabase
         .from('staffs')
         .select('*')
@@ -63,22 +68,11 @@ export default async function MedicalCooperationPage({
         .ilike('qualifications', '%看護師%')
         .order('name')
 
-    // Fetch Records for this month
-    // We need to construct range
-    const startObj = new Date(startDate)
-    const endObj = new Date(startObj.getFullYear(), startObj.getMonth() + 1, 0) // Last day
-    const endDate = endObj.toISOString().split('T')[0]
-
-    const { data: records } = await supabase
-        .from('medical_cooperation_records')
-        .select('*')
-        .eq('facility_id', facilityId)
-        .gte('date', startDate)
-        .lte('date', endDate)
-
     // Fetch Indicators for the whole month
-    const { getFindingsCountByRange } = await import('@/app/actions/findings') // Dynamic import to avoid cycles if any? No, standard import is fine usually.
-    // Actually standard import at top is better. But let's use what we have.
+    const { getFindingsCountByRange } = await import('@/app/actions/findings')
+    const startDate = `${currentMonth}-01`
+    const endObj = new Date(year, month, 0)
+    const endDate = endObj.toISOString().split('T')[0]
     const indicators = await getFindingsCountByRange(startDate, endDate, 'medical')
 
     return (
@@ -99,11 +93,11 @@ export default async function MedicalCooperationPage({
 
             <div className="flex-1 overflow-hidden">
                 <MedicalCooperationGrid
-                    residents={residents || []}
+                    matrix={matrix}
                     nurses={nurses || []}
-                    records={records || []}
                     currentDate={startDate}
                     findingsIndicators={indicators}
+                    facilityId={facilityId}
                 />
             </div>
         </div>

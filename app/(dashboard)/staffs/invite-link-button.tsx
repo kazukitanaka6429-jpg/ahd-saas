@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Link2, Loader2, Check } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { generateInviteLink } from '@/app/actions/invite'
+import { generateInviteLink } from '@/app/actions/staff'
 
 interface InviteLinkButtonProps {
     staffId: string

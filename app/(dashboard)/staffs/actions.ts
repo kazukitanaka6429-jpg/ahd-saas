@@ -41,6 +41,7 @@ export async function upsertStaff(formData: FormData) {
 
     const dataToSave = {
         facility_id: targetFacilityId,
+        organization_id: staff.organization_id,
         name,
         role,
         status,

@@ -10,14 +10,16 @@ import {
     TableRow,
 } from '@/components/ui/table'
 import { useState, useEffect, useCallback } from 'react'
-import { upsertDailyRecordsBulk } from '@/app/(dashboard)/daily-reports/actions'
+import { upsertDailyRecords } from '@/app/actions/daily-record'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Loader2, Save } from 'lucide-react'
 import { FindingSheet } from './finding-sheet'
 import { useGlobalSave } from '@/components/providers/global-save-context'
 import { cn } from '@/lib/utils'
-import { validateDailyReport, ValidationError, ValidationWarning, hasFieldError } from '@/lib/daily-report-validation'
+import { validateDailyReport } from '@/lib/daily-report-validation'
+import { ValidationError, ValidationWarning } from '@/types'
+import { hasFieldError } from '@/lib/daily-report-validation'
 import { ValidationWarningModal } from './validation-warning-modal'
 
 interface DailyReportGridProps {
@@ -68,7 +70,6 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
     const runValidation = useCallback(() => {
         const nightStaffCount = getSharedState<number>('nightStaffCount') || 0
         const nightShiftPlus = getSharedState<boolean>('nightShiftPlus') || false
-        console.log('[DailyReportGrid] Running validation with nightStaffCount:', nightStaffCount, 'nightShiftPlus:', nightShiftPlus)
 
         // Build records from localData
         const recordsToValidate = residents.map(resident => {
@@ -91,7 +92,6 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
         })
 
         const result = validateDailyReport(recordsToValidate, nightStaffCount, nightShiftPlus)
-        console.log('[DailyReportGrid] Validation result:', result.errors.length, 'errors,', result.warnings.length, 'warnings')
         setValidationErrors(result.errors)
         return result
     }, [residents, localData, getSharedState])
@@ -164,7 +164,14 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
 
             // 保存可能なレコードのみ保存
             if (recordsToSave.length > 0) {
-                const result = await upsertDailyRecordsBulk(recordsToSave)
+                // Adjust payload for new action
+                const payload = recordsToSave.map(r => ({
+                    ...r,
+                    // Use cast to avoid TS duplicate property error or spread error
+                    data: { ...r, ...(r.data || {}) }
+                }))
+
+                const result = await upsertDailyRecords(payload as any)
                 if (result.error) {
                     console.error("Daily report save failed", result.error)
                     throw new Error(result.error)
@@ -217,8 +224,9 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
 
             // CRITICAL: Update BOTH top-level and nested data object
             // getValue prioritizes data[key], so we must update data[key]
+            const currentData = (current.data || {}) as Record<string, any>
             const updatedData = {
-                ...(current.data || {}),
+                ...currentData,
                 [column]: value,
                 ...extraUpdatesData
             }

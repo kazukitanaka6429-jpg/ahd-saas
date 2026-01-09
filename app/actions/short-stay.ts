@@ -6,15 +6,19 @@ import { revalidatePath } from 'next/cache'
 import { getCurrentStaff } from '@/lib/auth-helpers'
 import { ShortStayRecord } from '@/types'
 
-export async function getShortStayRecord(date: string) {
+export async function getShortStayRecord(date: string, facilityId?: string) {
     const staff = await getCurrentStaff()
     if (!staff) return null
+
+    // Determine target facility
+    const targetFacilityId = facilityId || staff.facility_id
+    if (!targetFacilityId) return null
 
     const supabase = await createClient()
     const { data, error } = await supabase
         .from('short_stay_records')
         .select('*')
-        .eq('facility_id', staff.facility_id)
+        .eq('facility_id', targetFacilityId)
         .eq('date', date)
         .single()
 
@@ -22,33 +26,29 @@ export async function getShortStayRecord(date: string) {
         if (error.code === 'PGRST116') { // No rows found
             return null
         }
-        console.error('Error fetching short stay record:', error)
+        console.error('Error fetching short stay record:', JSON.stringify(error, null, 2))
         return null
     }
 
     return data as ShortStayRecord
 }
 
-export async function saveShortStayRecord(data: Partial<ShortStayRecord>) {
+export async function saveShortStayRecord(data: Partial<ShortStayRecord>, facilityId?: string) {
     const staff = await getCurrentStaff()
-    if (!staff) return { error: 'Unauthorized' }
+    if (!staff) return { error: '認証が必要です' }
+
+    // Determine target facility
+    const targetFacilityId = facilityId || staff.facility_id
+    if (!targetFacilityId) return { error: '施設の選択が必要です' }
 
     const supabase = await createClient()
 
     // Ensure facility_id is set
     const record = {
         ...data,
-        facility_id: staff.facility_id,
+        facility_id: targetFacilityId,
         updated_at: new Date().toISOString()
     }
-
-    // If ID is present, update. If not, insert.
-    // However, since we might not have the ID on the client if it was just loaded as null,
-    // we should rely on the UNIQUE(facility_id, date) constraint or handle it.
-    // Best way: Upsert based on id if given, else Insert.
-
-    // But if we insert and a record exists (race condition or client didn't have ID), upsert on constraint?
-    // Supabase .upsert() can handle conflict on unique columns.
 
     const { data: savedRecord, error } = await supabase
         .from('short_stay_records')
@@ -65,16 +65,19 @@ export async function saveShortStayRecord(data: Partial<ShortStayRecord>) {
     return { success: true, data: savedRecord }
 }
 
-export async function deleteShortStayRecord(id: string) {
+export async function deleteShortStayRecord(id: string, facilityId?: string) {
     const staff = await getCurrentStaff()
-    if (!staff) return { error: 'Unauthorized' }
+    if (!staff) return { error: '認証が必要です' }
+
+    const targetFacilityId = facilityId || staff.facility_id
+    if (!targetFacilityId) return { error: '施設の選択が必要です' }
 
     const supabase = await createClient()
     const { error } = await supabase
         .from('short_stay_records')
         .delete()
         .eq('id', id)
-        .eq('facility_id', staff.facility_id)
+        .eq('facility_id', targetFacilityId)
 
     if (error) {
         console.error('Error deleting short stay record:', error)

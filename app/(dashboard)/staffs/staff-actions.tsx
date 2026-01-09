@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { Edit, Trash2, Loader2 } from 'lucide-react'
-import { deleteStaff } from './actions'
+import { deleteStaff } from '@/app/actions/staff'
 import { toast } from "sonner"
 import { useState } from 'react'
 import { StaffFormDialog } from './staff-form-dialog'

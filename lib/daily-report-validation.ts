@@ -1,44 +1,12 @@
 'use client'
 
-import { DailyRecord } from '@/types'
+import { DailyRecordData, ValidationError, ValidationWarning, ValidationResult } from '@/types'
 
-// Validation Error Types
-export interface ValidationError {
-    id: string
+// UI Data Structure for Validation
+export interface ValidationTarget {
     residentId: string
     residentName: string
-    field: string
-    message: string
-}
-
-export interface ValidationWarning {
-    id: string
-    residentId: string
-    residentName: string
-    field: string
-    message: string
-}
-
-export interface ValidationResult {
-    errors: ValidationError[]
-    warnings: ValidationWarning[]
-    isValid: boolean
-}
-
-// Resident data with name for error messages
-interface ResidentRecord {
-    residentId: string
-    residentName: string
-    data: {
-        is_gh?: boolean
-        is_gh_night?: boolean
-        daytime_activity?: boolean | string
-        other_welfare_service?: string | null
-        meal_lunch?: boolean
-        emergency_transport?: boolean
-        hospitalization_status?: boolean
-        overnight_stay_status?: boolean
-    }
+    data: DailyRecordData
 }
 
 /**
@@ -49,7 +17,7 @@ interface ResidentRecord {
  * @returns ValidationResult with errors and warnings
  */
 export function validateDailyReport(
-    records: ResidentRecord[],
+    records: ValidationTarget[],
     nightStaffCount: number,
     nightShiftPlus: boolean = false
 ): ValidationResult {
@@ -57,9 +25,7 @@ export function validateDailyReport(
     const warnings: ValidationWarning[] = []
 
     // A1: Facility-level check - Night Shift Plus enabled but not enough staff
-    // This is a facility-level error, not per-resident
     if (nightShiftPlus && nightStaffCount < 4) {
-        console.log(`[Validation A1] Facility-level ERROR: nightShiftPlus=${nightShiftPlus}, nightStaffCount=${nightStaffCount}`)
         errors.push({
             id: 'A1-facility',
             residentId: '',
@@ -77,29 +43,11 @@ export function validateDailyReport(
             (typeof data.daytime_activity === 'string' && data.daytime_activity.trim().length > 0)
 
         // A2a: Day Activity Required - At least one of GH or daytime_activity must be checked
-        // エラー時は GH, 日中活動, その他福祉サービス の3項目すべてにエラー表示
         if (!data.is_gh && !hasDaytimeActivity) {
-            errors.push({
-                id: `A2a-daytime-${residentId}`,
-                residentId,
-                residentName,
-                field: 'daytime_activity',
-                message: 'GH または 日中活動 のいずれかは必須です。'
-            })
-            errors.push({
-                id: `A2a-gh-${residentId}`,
-                residentId,
-                residentName,
-                field: 'is_gh',
-                message: 'GH または 日中活動 のいずれかは必須です。'
-            })
-            errors.push({
-                id: `A2a-welfare-${residentId}`,
-                residentId,
-                residentName,
-                field: 'other_welfare_service',
-                message: 'GH または 日中活動 のいずれかは必須です。'
-            })
+            const msg = 'GH または 日中活動 のいずれかは必須です。'
+            errors.push({ id: `A2a-daytime-${residentId}`, residentId, residentName, field: 'daytime_activity', message: msg })
+            errors.push({ id: `A2a-gh-${residentId}`, residentId, residentName, field: 'is_gh', message: msg })
+            errors.push({ id: `A2a-welfare-${residentId}`, residentId, residentName, field: 'other_welfare_service', message: msg })
         }
 
         // A2b: If daytime_activity is checked, other_welfare_service must be filled
@@ -113,43 +61,19 @@ export function validateDailyReport(
             })
         }
 
-        // A3: Night Status Required - At least one of the night options must be checked
-        // エラー時は GH泊, 救急搬送, 入院, 外泊 の4項目すべてにエラー表示
+        // A3: Night Status Required
         const hasNightStatus = data.is_gh_night || data.emergency_transport ||
             data.hospitalization_status || data.overnight_stay_status
+
         if (!hasNightStatus) {
-            errors.push({
-                id: `A3-night-${residentId}`,
-                residentId,
-                residentName,
-                field: 'is_gh_night',
-                message: '夜間の状況（GH泊など）は必須項目です。'
-            })
-            errors.push({
-                id: `A3-emergency-${residentId}`,
-                residentId,
-                residentName,
-                field: 'emergency_transport',
-                message: '夜間の状況（GH泊など）は必須項目です。'
-            })
-            errors.push({
-                id: `A3-hospital-${residentId}`,
-                residentId,
-                residentName,
-                field: 'hospitalization_status',
-                message: '夜間の状況（GH泊など）は必須項目です。'
-            })
-            errors.push({
-                id: `A3-overnight-${residentId}`,
-                residentId,
-                residentName,
-                field: 'overnight_stay_status',
-                message: '夜間の状況（GH泊など）は必須項目です。'
-            })
+            const msg = '夜間の状況（GH泊など）は必須項目です。'
+            errors.push({ id: `A3-night-${residentId}`, residentId, residentName, field: 'is_gh_night', message: msg })
+            errors.push({ id: `A3-emergency-${residentId}`, residentId, residentName, field: 'emergency_transport', message: msg })
+            errors.push({ id: `A3-hospital-${residentId}`, residentId, residentName, field: 'hospitalization_status', message: msg })
+            errors.push({ id: `A3-overnight-${residentId}`, residentId, residentName, field: 'overnight_stay_status', message: msg })
         }
 
         // B2: Lunch Contradiction Warning
-        // If meal_lunch AND daytime_activity are both checked → Warning
         if (data.meal_lunch && hasDaytimeActivity) {
             warnings.push({
                 id: `B2-${residentId}`,
@@ -160,8 +84,6 @@ export function validateDailyReport(
             })
         }
     })
-
-
 
     return {
         errors,

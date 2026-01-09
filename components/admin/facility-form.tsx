@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { Facility } from '@/types'
-import { upsertFacility } from '@/app/actions/admin/facilities'
+import { createFacility, updateFacility } from '@/app/actions/facility'
 import { Button } from '@/components/ui/button'
 import {
     Dialog,
@@ -58,7 +58,11 @@ export function FacilityForm({ initialData, trigger, onSuccess }: FacilityFormPr
     const onSubmit = async (data: FormData) => {
         setIsSubmitting(true)
         try {
-            await upsertFacility(data)
+            if (initialData?.id) {
+                await updateFacility(initialData.id, data)
+            } else {
+                await createFacility(data)
+            }
             toast.success('保存しました')
             setOpen(false)
             form.reset()

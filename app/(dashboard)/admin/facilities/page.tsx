@@ -1,4 +1,4 @@
-import { getFacilities } from '@/app/actions/admin/facilities'
+import { getFacilities } from '@/app/actions/facility'
 import { FacilitiesGrid } from '@/components/admin/facilities-grid'
 import { FacilityForm } from '@/components/admin/facility-form'
 import { requireAuth } from '@/lib/auth-helpers'
@@ -15,7 +15,8 @@ export default async function FacilitiesPage() {
         redirect('/')
     }
 
-    const facilities = await getFacilities()
+    const result = await getFacilities()
+    const facilities = result.data || []
 
     return (
         <div className="space-y-6">

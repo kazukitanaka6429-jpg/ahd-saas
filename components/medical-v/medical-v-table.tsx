@@ -15,9 +15,10 @@ interface MedicalVTableProps {
     targetCount: number
     year: number
     month: number
+    facilityId?: string
 }
 
-export function MedicalVTable({ data, residents, targetCount, year, month }: MedicalVTableProps) {
+export function MedicalVTable({ data, residents, targetCount, year, month, facilityId }: MedicalVTableProps) {
     const [isPending, startTransition] = useTransition()
     const [localRows, setLocalRows] = useState(data)
     const [changedDates, setChangedDates] = useState<Set<string>>(new Set())
@@ -105,7 +106,7 @@ export function MedicalVTable({ data, residents, targetCount, year, month }: Med
                 if (!row) return
 
                 // 1. Save Nurse Count & Daily Record
-                const p1 = upsertMedicalVDaily(date, { nurse_count: row.nurse_count }, targetCount)
+                const p1 = upsertMedicalVDaily(date, { nurse_count: row.nurse_count }, targetCount, facilityId)
                 promises.push(p1)
 
 
@@ -115,7 +116,7 @@ export function MedicalVTable({ data, residents, targetCount, year, month }: Med
                     const initialVal = !!(initialRow?.records?.[r.id])
 
                     if (currentVal !== initialVal) {
-                        promises.push(toggleMedicalVRecord(date, r.id, currentVal))
+                        promises.push(toggleMedicalVRecord(date, r.id, currentVal, facilityId))
                     }
                 })
             })
