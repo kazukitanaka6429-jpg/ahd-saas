@@ -44,6 +44,7 @@ export function StaffShiftGrid({ staffs, initialData, date, facilityId }: StaffS
                 ...shiftData,
                 day_staff_ids: cleanArray(shiftData.day_staff_ids as any[]),
                 night_staff_ids: cleanArray(shiftData.night_staff_ids as any[]),
+                night_shift_plus: !!shiftData.night_shift_plus, // Ensure boolean
             }
 
             const result = await upsertDailyShift(date, payload, facilityId)

@@ -97,7 +97,7 @@ export function ResidentFormDialog({ currentStaff, initialData, trigger, open: c
             unit_id: (unitIdValue && unitIdValue !== 'none') ? unitIdValue : null,
             display_id: displayIdValue ? parseInt(displayIdValue) : undefined,
             name: formData.get('name') as string,
-            status: formData.get('status') as 'in_facility' | 'hospitalized' | 'home_stay' | 'left' | 'deceased',
+            status: formData.get('status') as 'in_facility' | 'hospitalized' | 'home_stay' | 'left',
             care_level: formData.get('classification') as string || undefined, // UI uses classification
             start_date: formData.get('start_date') as string || undefined,
             // direct_debit_start_date removed as per schema

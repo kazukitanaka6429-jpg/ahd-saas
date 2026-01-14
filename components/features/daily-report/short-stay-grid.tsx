@@ -155,7 +155,7 @@ export function ShortStayGrid({ residents, record: initialRecord, date, facility
                 throw new Error(result.error)
             }
             if (result.data) {
-                setFormData(prev => ({ ...prev, id: result.data.id }))
+                setFormData(prev => ({ ...prev, id: result.data!.id }))
             }
             return { savedCount: 1, failedCount: 0 }
         })

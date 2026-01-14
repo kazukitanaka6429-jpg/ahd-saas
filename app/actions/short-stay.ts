@@ -182,6 +182,7 @@ export async function getShortStayMatrix(
         // Map: residentId -> date -> record
         const recordMap = new Map<string, Map<string, ShortStayRecord>>()
         records?.forEach(r => {
+            if (!r.resident_id) return // skip if no resident_id
             if (!recordMap.has(r.resident_id)) {
                 recordMap.set(r.resident_id, new Map())
             }

@@ -11,7 +11,7 @@ import { z } from 'zod'
 const BillingCsvRowSchema = z.object({
     '利用者名': z.string().min(1, { message: '利用者名は必須です' }),
     '利用料項目名': z.string().min(1, { message: '利用料項目名は必須です' }),
-    '数量': z.coerce.number({ invalid_type_error: '数量は数値である必要があります' }).int().nonnegative().optional().default(0),
+    '数量': z.coerce.number().int().nonnegative().optional().default(0),
     '金額': z.coerce.number().optional().default(0)
 }).strip() // Remove extra columns
 
@@ -59,7 +59,7 @@ export async function importBillingCsv(formData: FormData) {
                 // Schema requires name and item min(1).
                 validRows.push(result.data)
             } else {
-                const errorMsg = result.error.errors.map(e => e.message).join(', ')
+                const errorMsg = result.error.issues.map((e: any) => e.message).join(', ')
                 errors.push(`Row ${index + 1}: ${errorMsg}`)
             }
         })
