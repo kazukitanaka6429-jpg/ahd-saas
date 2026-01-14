@@ -322,7 +322,7 @@ export function ShortStayGrid({ residents, record: initialRecord, date, facility
                                 </div>
                             </TableHead>
                             <TableHead className={cn(cellBase, headerBase, "w-[120px]")} colSpan={2}>
-                                <div className="border-b border-black py-1">入退去時間 <span className="text-red-500 text-xs">(必須)</span></div>
+                                <div className="border-b border-black py-1">入退去時間 <span className="text-red-500 text-xs">(入退去日の場合必須)</span></div>
                             </TableHead>
                             <TableHead className={cn(cellBase, headerBase, "w-[60px]")} rowSpan={2}>
                                 <div className="flex flex-col justify-center h-full gap-1">

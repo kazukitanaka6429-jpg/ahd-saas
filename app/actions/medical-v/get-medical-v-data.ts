@@ -82,16 +82,12 @@ export async function getMedicalVData(year: number, month: number, facilityIdArg
         const daysInMonth = lastDayObj.getDate()
         const endDateStr = `${year}-${String(month).padStart(2, '0')}-${daysInMonth}`
 
-        // 2. Fetch Residents (All active OR in_facility) - Matching other pages
+        // 2. Fetch Residents (Only those with sputum_suction = true)
         const { data: residents, error: resError } = await supabase
             .from('residents')
             .select('*')
             .eq('facility_id', facilityId)
-            .neq('status', 'left') // Show all except left, to be safe. Or 'in_facility' if strict.
-            // Using 'neq left' to match other pages behavior if possible, or keeping 'in_facility' if that's the requirement.
-            // Previous code used 'in_facility'. Let's stick to it or broaden if "disappeared" means they are hospitalized?
-            // User complained "residents disappeared". If they are not 'in_facility', they disappear.
-            // Let's broaden to 'neq left' to be safe, like Medical IV.
+            .eq('sputum_suction', true)  // Only show sputum_suction residents
             .neq('status', 'left')
             .order('display_id', { ascending: true, nullsFirst: false })
 
