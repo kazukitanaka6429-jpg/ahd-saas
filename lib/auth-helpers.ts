@@ -12,12 +12,13 @@ export const ROLES = {
 
 type Role = typeof ROLES[keyof typeof ROLES]
 
-export async function getCurrentStaff() {
+export async function getCurrentStaff(shouldRedirect: boolean = true) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
-        redirect('/login')
+        if (shouldRedirect) redirect('/login')
+        return null
     }
 
     const cookieStore = await cookies()
@@ -54,21 +55,21 @@ export async function getCurrentStaff() {
     }
 
     if (staffs.length === 1) {
+        // Auto-set cookie context implicitly by returning it
         return staffs[0] as Staff
     }
 
     // Multiple records found.
     // Optimization for SaaS: If one of them is the Organization Admin (facility_id is null, role is admin),
     // prioritize returning that one implicitly unless a cookie overrides it.
-    // This allows the Admin to "log in" without hitting the selection screen immediately if they don't have a cookie.
-    // They will be "Global Admin" context.
     const adminStaff = staffs.find(s => s.role === 'admin' && s.facility_id === null)
     if (adminStaff) {
         return adminStaff as Staff
     }
 
     // If no clear admin, and multiple specific facilities, redirect to select
-    redirect('/select-facility')
+    if (shouldRedirect) redirect('/select-facility')
+    return null
 }
 
 export async function requireAuth() {

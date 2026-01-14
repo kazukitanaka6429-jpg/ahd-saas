@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { logger } from '@/lib/logger'
 
 export async function registerUser(token: string, password: string, name: string) {
     const supabase = await createClient()
@@ -60,8 +61,8 @@ export async function registerUser(token: string, password: string, name: string
         })
 
     if (staffError) {
-        console.error('Staff Create Error:', staffError)
-        return { error: '職員データの作成に失敗しました: ' + staffError.message }
+        logger.error('Staff Create Error:', staffError)
+        return { error: '職員データの作成に失敗しました' }
     }
 
     // 4. Mark Invitation as Used

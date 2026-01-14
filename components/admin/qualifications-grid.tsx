@@ -13,21 +13,12 @@ import {
     TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { toast } from 'sonner'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Pencil } from 'lucide-react'
+import { DeleteButton } from '@/components/common/delete-button'
 
 export function QualificationsGrid({ data }: { data: Qualification[] }) {
-    const handleDelete = async (id: string, name: string) => {
-        if (!confirm(`資格「${name}」を削除してもよろしいですか？`)) return
 
-        try {
-            await deleteQualification(id)
-            toast.success('削除しました')
-        } catch (error) {
-            toast.error('削除に失敗しました')
-            console.error(error)
-        }
-    }
+    // handleDelete logic moved to DeleteButton component
 
     return (
         <div className="border rounded-md">
@@ -67,14 +58,13 @@ export function QualificationsGrid({ data }: { data: Qualification[] }) {
                                                 </Button>
                                             }
                                         />
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
+                                        <DeleteButton
+                                            id={item.id}
+                                            onDelete={deleteQualification}
+                                            iconOnly
+                                            confirmMessage={`資格「${item.name}」を削除してもよろしいですか？`}
                                             className="h-8 w-8 text-destructive hover:text-destructive"
-                                            onClick={() => handleDelete(item.id, item.name)}
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
+                                        />
                                     </div>
                                 </TableCell>
                             </TableRow>

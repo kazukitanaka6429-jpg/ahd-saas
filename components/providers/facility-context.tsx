@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 import { Staff, Facility } from '@/types'
 import { toast } from 'sonner'
 
+import { setFacilityCookie } from '@/app/actions/facility-cookie'
+
 type FacilityContextType = {
     currentFacility: Facility | null
     accessibleFacilities: Facility[]
@@ -16,7 +18,15 @@ type FacilityContextType = {
 
 const FacilityContext = createContext<FacilityContextType | undefined>(undefined)
 
-export function FacilityProvider({ children, initialStaff }: { children: React.ReactNode, initialStaff: Staff | null }) {
+export function FacilityProvider({
+    children,
+    initialStaff,
+    initialFacilityId
+}: {
+    children: React.ReactNode,
+    initialStaff: Staff | null,
+    initialFacilityId?: string
+}) {
     const [currentFacility, setCurrentFacility] = useState<Facility | null>(null)
     const [accessibleFacilities, setAccessibleFacilities] = useState<Facility[]>([])
     const [isLoading, setIsLoading] = useState(true)
@@ -28,7 +38,7 @@ export function FacilityProvider({ children, initialStaff }: { children: React.R
     const supabase = createClient()
 
     // Determine if user is a "Global Admin" (Organization Admin)
-    const isGlobalAdmin = initialStaff?.role === 'admin' && initialStaff?.facility_id === null
+    const isGlobalAdmin = initialStaff?.role === 'admin'
 
     useEffect(() => {
         const fetchFacilities = async () => {
@@ -70,27 +80,30 @@ export function FacilityProvider({ children, initialStaff }: { children: React.R
                 // 1. URL Query Parameter
                 const urlFacilityId = searchParams.get('facility_id')
                 let selected: Facility | undefined
-                let needsUrlUpdate = false
 
                 if (urlFacilityId) {
                     selected = facilities.find(f => f.id === urlFacilityId)
                 }
+                // 2. Cookie / Prop Persistence
+                else if (initialFacilityId) {
+                    selected = facilities.find(f => f.id === initialFacilityId)
+                }
 
-                // 2. Local Storage / Cookie (Optional - simplified to logic for now)
-
-                // 3. Fallback (First available) - also update URL for server-side sync
+                // 3. Fallback (First available)
+                let needsUrlUpdate = false
                 if (!selected && facilities.length > 0) {
                     selected = facilities[0]
-                    needsUrlUpdate = true // Need to sync URL with default selection
+                    needsUrlUpdate = true
                 }
 
                 setCurrentFacility(selected || null)
 
-                // If we selected a default and URL doesn't have it, update URL for server sync
-                if (needsUrlUpdate && selected && isGlobalAdmin) {
-                    const params = new URLSearchParams(searchParams.toString())
-                    params.set('facility_id', selected.id)
-                    router.replace(`${pathname}?${params.toString()}`)
+                // If we defaulted to 0 or used cookie, but URL has nothing, we might want to sync URL?
+                // Actually, if we use cookies, we don't *strictly* need URL param everywhere if the cookie holds truth.
+                // But for shareable links, URL param is good.
+                if (selected && !urlFacilityId && isGlobalAdmin) {
+                    // Optionally sync URL, but doing so might trigger replace which we want to avoid if not needed.
+                    // Let's rely on Cookie primarily.
                 }
 
             } catch (error) {
@@ -102,7 +115,7 @@ export function FacilityProvider({ children, initialStaff }: { children: React.R
         }
 
         fetchFacilities()
-    }, [initialStaff, isGlobalAdmin, searchParams, supabase, router, pathname])
+    }, [initialStaff, isGlobalAdmin, searchParams, supabase, initialFacilityId])
 
     const switchFacility = (facilityId: string) => {
         const target = accessibleFacilities.find(f => f.id === facilityId)
@@ -110,12 +123,14 @@ export function FacilityProvider({ children, initialStaff }: { children: React.R
 
         setCurrentFacility(target)
 
-        // Persist to URL
+        // Persist to Cookie
+        setFacilityCookie(facilityId)
+
+        // Persist to URL (still useful for deep linking)
         const params = new URLSearchParams(searchParams.toString())
         params.set('facility_id', facilityId)
 
         startTransition(() => {
-            // Replace URL without full reload, but let Next.js re-render page components based on searchParams
             router.replace(`${pathname}?${params.toString()}`)
             toast.message(`${target.name} に切り替えました`)
         })

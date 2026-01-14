@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { AlertCircle, RefreshCw, CheckCircle2, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { DashboardFilter, FilterValues } from './DashboardFilter'
-import { getStaffListForFilter, SimpleStaff } from '@/app/actions/staffs'
+import { getStaffListForFilter, SimpleStaff } from '@/app/actions/staff'
 
 type ExtendedNotification = FacilityNotification & { resolved_staff?: { name: string } | null, created_staff?: { name: string } | null }
 

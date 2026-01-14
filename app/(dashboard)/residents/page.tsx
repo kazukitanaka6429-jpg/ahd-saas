@@ -12,10 +12,13 @@ import { Resident } from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { getCurrentStaff } from '@/app/actions/auth'
 import { getResidents } from '@/app/actions/resident'
+import { getResidentAlertLevels } from '@/app/actions/resident-documents'
 import { redirect } from 'next/navigation'
+import { AlertTriangle, AlertCircle, Info } from 'lucide-react'
 
 import { ResidentFacilityFilter } from './resident-facility-filter'
 import { createClient } from '@/lib/supabase/server'
+import { AlertLevel } from '@/lib/document-types'
 
 export default async function ResidentsPage({ searchParams }: { searchParams: Promise<{ facility_id?: string }> }) {
     const staff = await getCurrentStaff()
@@ -25,14 +28,22 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
     const facilityIdOverride = params.facility_id === 'all' ? undefined : params.facility_id
 
     // Fetch facilities for Admin filter
-    let facilities: any[] = [] // Using any[] to bypass type issues quickly, can be typed correctly as Facility[]
+    let facilities: any[] = []
     if (staff.role === 'admin') {
         const supabase = await createClient()
         const { data } = await supabase.from('facilities').select('*').order('name')
         if (data) facilities = data
     }
 
-    const { data: residents, error } = await getResidents(facilityIdOverride)
+    // Fetch residents and alert levels in parallel
+    const [residentsResult, alertsResult] = await Promise.all([
+        getResidents(facilityIdOverride),
+        getResidentAlertLevels()
+    ])
+
+    const residents = residentsResult.data
+    const error = residentsResult.error
+    const alertLevels = alertsResult.data
 
     if (error) {
         return <div className="p-8 text-red-500">エラーが発生しました: {error}</div>
@@ -49,6 +60,30 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
     }
 
     const getFlagLabel = (val: boolean) => val ? <span className="text-green-600">あり</span> : <span className="text-gray-300">-</span>
+
+    const getAlertIcon = (level: AlertLevel | undefined) => {
+        if (!level) return null
+        switch (level) {
+            case 'critical':
+                return (
+                    <span className="inline-flex items-center ml-1" title="書類の期限が切れているか、30日以内です">
+                        <AlertTriangle className="h-4 w-4 text-red-500" />
+                    </span>
+                )
+            case 'warning':
+                return (
+                    <span className="inline-flex items-center ml-1" title="書類の期限まで60日以内です">
+                        <AlertCircle className="h-4 w-4 text-orange-500" />
+                    </span>
+                )
+            case 'info':
+                return (
+                    <span className="inline-flex items-center ml-1" title="書類の期限まで90日以内です">
+                        <Info className="h-4 w-4 text-blue-500" />
+                    </span>
+                )
+        }
+    }
 
     return (
         <div className="space-y-6">
@@ -77,12 +112,6 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
                             <TableRow className="bg-gray-50/50">
                                 <TableHead className="min-w-[80px] font-bold text-gray-700">ID</TableHead>
                                 <TableHead className="min-w-[150px] font-bold text-gray-700">氏名</TableHead>
-                                {/* Admin sees facility name via join, but getResidents returns Flat object usually? 
-                                    Need to check if getResidents joins. 
-                                    Currently getResidents selects * from residents. 
-                                    If we need facility name, we need to update getResidents to join.
-                                    For now, omit facility name column unless joined.
-                                */}
                                 <TableHead>状況</TableHead>
                                 <TableHead>介護度/区分</TableHead>
                                 <TableHead>入居日</TableHead>
@@ -102,7 +131,12 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
                             {residents?.map((resident: Resident) => (
                                 <TableRow key={resident.id}>
                                     <TableCell className="font-medium sticky left-0 bg-white z-10">{resident.display_id || '-'}</TableCell>
-                                    <TableCell className="font-medium bg-white z-10">{resident.name}</TableCell>
+                                    <TableCell className="font-medium bg-white z-10">
+                                        <span className="inline-flex items-center">
+                                            {resident.name}
+                                            {getAlertIcon(alertLevels[resident.id])}
+                                        </span>
+                                    </TableCell>
 
                                     <TableCell>{getStatusLabel(resident.status)}</TableCell>
                                     <TableCell>{resident.care_level || '-'}</TableCell>

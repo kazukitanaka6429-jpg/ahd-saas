@@ -3,6 +3,7 @@ import { FacilityProvider } from '@/components/providers/facility-context'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
+import { StaffWithFacility } from '@/types'
 
 export default async function DashboardLayout({
     children,
@@ -62,16 +63,18 @@ export default async function DashboardLayout({
         initialStaff = allStaffs[0]
     }
 
+    const selectedFacilityId = cookieStore.get('selected_facility_id')?.value
+
     return (
-        <FacilityProvider initialStaff={initialStaff as any}>
-            <div className="flex min-h-screen flex-row">
+        <FacilityProvider initialStaff={initialStaff as StaffWithFacility} initialFacilityId={selectedFacilityId}>
+            <div className="flex h-screen overflow-hidden flex-row">
                 <Sidebar
                     role={initialStaff?.role}
                     // Facility Name handling is now dynamic within Sidebar via Switcher, but passing initial prop as fallback
-                    facilityName={(initialStaff?.facilities as any)?.name}
+                    facilityName={(initialStaff as StaffWithFacility)?.facilities?.name}
                     hasMultipleAccounts={false} // Deprecated/Handled by Switcher now
                 />
-                <main className="flex-1 overflow-y-auto bg-white p-8">
+                <main className="flex-1 overflow-y-auto bg-background p-8">
                     {children}
                 </main>
             </div>

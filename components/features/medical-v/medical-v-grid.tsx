@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
     Table,
     TableBody,
@@ -10,23 +10,21 @@ import {
     TableRow,
     TableFooter
 } from '@/components/ui/table'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
-    getMedicalVData,
-    MedicalVData,
-    MedicalVRecord
+    MedicalVData
 } from '@/app/actions/medical-v/get-medical-v-data'
 import {
-    upsertMedicalVDaily,
-    toggleMedicalVRecord,
     saveMedicalVDataBulk
 } from '@/app/actions/medical-v/upsert-medical-v'
 import { toast } from 'sonner'
 import { Loader2, Save, AlertTriangle } from 'lucide-react'
-import holiday_jp from '@holiday-jp/holiday_jp'
+import { MedicalVRow } from './medical-v-row'
+import { cn } from '@/lib/utils'
+import { Unit } from '@/app/actions/units'
+import { FindingSheet } from '../daily-report/finding-sheet'
+import { getFindingsPathsByRecordId } from '@/app/actions/findings'
 
 // Props definition
 interface Props {
@@ -35,53 +33,30 @@ interface Props {
     targetCount: number
     currentDate: string // YYYY-MM-DD
     facilityId?: string
+    units?: Unit[]
 }
 
 // Types for pending updates
 type PendingDaily = { nurse_count: number }
 type PendingRecord = { is_executed: boolean }
 
-// Helper: Check if date is a Japanese holiday
-const isHoliday = (date: Date): boolean => {
-    return holiday_jp.isHoliday(date)
-}
-
-// Helper: Get day type for styling
-const getDayType = (date: Date): 'weekday' | 'saturday' | 'sunday' | 'holiday' => {
-    if (isHoliday(date)) return 'holiday'
-    const day = date.getDay()
-    if (day === 0) return 'sunday'
-    if (day === 6) return 'saturday'
-    return 'weekday'
-}
-
-// Helper: Get text color class based on day type
-const getDateTextColor = (dayType: 'weekday' | 'saturday' | 'sunday' | 'holiday'): string => {
-    switch (dayType) {
-        case 'saturday': return 'text-blue-600'
-        case 'sunday': return 'text-red-600'
-        case 'holiday': return 'text-red-600'
-        default: return 'text-gray-900'
-    }
-}
-
-// Helper: Check if date is before resident's admission (start_date)
-const isBeforeAdmission = (dateStr: string, resident: any): boolean => {
-    if (!resident.start_date) return false
-    const cellDate = new Date(dateStr)
-    const admissionDate = new Date(resident.start_date)
-    // Compare dates only (ignore time)
-    cellDate.setHours(0, 0, 0, 0)
-    admissionDate.setHours(0, 0, 0, 0)
-    return cellDate < admissionDate
-}
-
-export function MedicalVGrid({ residents = [], rows: initialRows = [], targetCount = 0, currentDate, facilityId }: Props) {
+export function MedicalVGrid({ residents = [], rows: initialRows = [], targetCount = 0, currentDate, facilityId, units = [] }: Props) {
     const [rows, setRows] = useState<MedicalVData[]>(initialRows || [])
     const [isDirty, setIsDirty] = useState(false)
     const [pendingDailies, setPendingDailies] = useState<Map<string, PendingDaily>>(new Map())
     const [pendingRecords, setPendingRecords] = useState<Map<string, PendingRecord>>(new Map())
     const [isSaving, setIsSaving] = useState(false)
+
+    // Unit Filtering State
+    const [selectedUnitId, setSelectedUnitId] = useState<string>('all')
+
+    // Filter Residents based on Unit
+    const filteredResidents = useMemo(() => residents.filter(r => {
+        if (units.length === 0) return true
+        if (selectedUnitId === 'all') return true
+        if (selectedUnitId === 'none') return !r.unit_id
+        return r.unit_id === selectedUnitId
+    }), [residents, units, selectedUnitId])
 
     useEffect(() => {
         setRows(initialRows || [])
@@ -90,12 +65,43 @@ export function MedicalVGrid({ residents = [], rows: initialRows = [], targetCou
         setIsDirty(false)
     }, [initialRows])
 
-    // Toggle Checkbox with admission date validation
-    const handleToggle = (dateStr: string, residentId: string, currentVal: boolean, resident: any) => {
-        // ② Check admission date - prevent checking before admission
-        if (isBeforeAdmission(dateStr, resident)) {
-            toast.error(`この利用者は ${resident.start_date} から入居のため、それ以前の日付にチェックを付けることはできません。`)
+    // Finding State for date column
+    const [findingState, setFindingState] = useState<{
+        isOpen: boolean
+        dailyId: string | null
+        label: string
+    }>({ isOpen: false, dailyId: null, label: '' })
+
+    // Findings paths by dailyId
+    const [findingsDailyPaths, setFindingsDailyPaths] = useState<Record<string, string[]>>({})
+
+    // Handle date column context menu
+    const handleDateContextMenu = useCallback((e: React.MouseEvent, dailyId: string | undefined, dateLabel: string) => {
+        if (!dailyId) {
+            toast.warning('まずはデータを保存してください')
             return
+        }
+        setFindingState({
+            isOpen: true,
+            dailyId,
+            label: `医療連携V - ${dateLabel}`
+        })
+    }, [])
+
+    // Toggle Checkbox - Memozied
+    const handleToggle = useCallback((dateStr: string, residentId: string, currentVal: boolean, resident: any) => {
+        // Admission date check logic is also inside Row for UI, but double check here or in Row?
+        // Let's keep validation here or leave it to Row validation prop?
+        // Row already checks disabled state. But simple check here is safe.
+        if (resident.start_date) {
+            const cellDate = new Date(dateStr)
+            const admissionDate = new Date(resident.start_date)
+            cellDate.setHours(0, 0, 0, 0)
+            admissionDate.setHours(0, 0, 0, 0)
+            if (cellDate < admissionDate) {
+                toast.error(`入居日前の日付です`)
+                return
+            }
         }
 
         const newVal = !currentVal
@@ -114,10 +120,10 @@ export function MedicalVGrid({ residents = [], rows: initialRows = [], targetCou
             return next
         })
         setIsDirty(true)
-    }
+    }, [])
 
-    // Update Daily Inputs
-    const handleDailyUpdate = (dateStr: string, value: string) => {
+    // Update Daily Inputs - Memoized
+    const handleDailyUpdate = useCallback((dateStr: string, value: string) => {
         const numVal = parseInt(value)
         if (isNaN(numVal)) return
         setRows(prev => prev.map(r => {
@@ -132,7 +138,7 @@ export function MedicalVGrid({ residents = [], rows: initialRows = [], targetCou
             return next
         })
         setIsDirty(true)
-    }
+    }, [])
 
     const onSave = async () => {
         if (!isDirty) return
@@ -167,7 +173,7 @@ export function MedicalVGrid({ residents = [], rows: initialRows = [], targetCou
     const year = dateObj.getFullYear()
     const month = dateObj.getMonth() + 1
 
-    // Units Calculation
+    // Calculation Units Helper (Reused for Totals)
     const getEstimatedUnits = (nurseCount: number) => {
         const tc = targetCount <= 0 ? 1 : targetCount
         return Math.floor((500 * nurseCount) / tc)
@@ -196,28 +202,32 @@ export function MedicalVGrid({ residents = [], rows: initialRows = [], targetCou
         return { totalNurses, totalUnits, residentCounts }
     }, [rows, pendingDailies, residents, targetCount])
 
+    // Optimization: Pre-calculate dirty keys for passing to Rows as primitive
+    // This allows React.memo to work effectively
+    const allPendingRecordKeys = useMemo(() => Array.from(pendingRecords.keys()), [pendingRecords])
+
     return (
-        <div className="flex flex-col h-full overflow-hidden border rounded-lg bg-white shadow-md relative">
+        <div className="flex flex-col h-full overflow-hidden border rounded-lg bg-white shadow-sm relative filter-drop-shadow">
             {/* Unsaved Changes Warning Banner */}
             {isDirty && (
-                <Alert variant="destructive" className="rounded-none border-x-0 border-t-0 bg-orange-100 border-orange-300">
-                    <AlertTriangle className="h-5 w-5 text-orange-600" />
-                    <AlertDescription className="text-base font-medium text-orange-800">
+                <Alert variant="destructive" className="rounded-none border-x-0 border-t-0 bg-amber-50 border-amber-200">
+                    <AlertTriangle className="h-5 w-5 text-amber-600" />
+                    <AlertDescription className="text-base font-medium text-amber-800">
                         ⚠️ 保存されていない変更があります。「保存」ボタンを押してください。
                     </AlertDescription>
                 </Alert>
             )}
 
             {/* Header with Summary & Save */}
-            <div className="bg-green-100 border-b border-green-200 px-4 py-3 flex justify-between items-center shrink-0">
+            <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex justify-between items-center shrink-0">
                 <div className="flex gap-8 items-center">
                     <div className="flex flex-col items-center">
-                        <span className="text-sm font-bold text-green-800">当月喀痰吸引が必要な利用者数</span>
-                        <span className="text-2xl font-bold">{targetCount}名</span>
+                        <span className="text-sm font-bold text-slate-500">当月喀痰吸引が必要な利用者数</span>
+                        <span className="text-2xl font-bold text-slate-800">{targetCount}名</span>
                     </div>
                     <div className="flex flex-col items-center">
-                        <span className="text-sm font-bold text-green-800">当月合計単位数</span>
-                        <span className="text-2xl font-bold text-blue-700">{monthlyTotals.totalUnits.toLocaleString()}</span>
+                        <span className="text-sm font-bold text-slate-500">当月合計単位数</span>
+                        <span className="text-2xl font-bold text-blue-600">{monthlyTotals.totalUnits.toLocaleString()}</span>
                     </div>
                 </div>
 
@@ -225,9 +235,9 @@ export function MedicalVGrid({ residents = [], rows: initialRows = [], targetCou
                     onClick={onSave}
                     disabled={!isDirty || isSaving}
                     size="lg"
-                    className={`font-bold text-lg px-6 py-3 h-auto ${isDirty
-                        ? 'bg-orange-500 hover:bg-orange-600 text-white shadow-lg'
-                        : 'bg-green-600 hover:bg-green-700 text-white'}`}
+                    className={`font-bold text-lg px-6 py-3 h-auto transition-all ${isDirty
+                        ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-md'
+                        : 'bg-slate-600 hover:bg-slate-700 text-white'}`}
                 >
                     {isSaving ? (
                         <>
@@ -243,106 +253,120 @@ export function MedicalVGrid({ residents = [], rows: initialRows = [], targetCou
                 </Button>
             </div>
 
+            {units.length > 0 && (
+                <div className="px-4 pt-4 border-b">
+                    <div className="flex space-x-1">
+                        {units.map(unit => (
+                            <button
+                                key={unit.id}
+                                onClick={() => setSelectedUnitId(unit.id)}
+                                className={cn(
+                                    "px-4 py-2 text-sm font-medium rounded-t-lg border-t border-l border-r border-transparent transition-colors",
+                                    selectedUnitId === unit.id
+                                        ? "bg-white border-gray-200 text-blue-600 border-b-white translate-y-[1px]"
+                                        : "bg-gray-50 text-gray-500 hover:text-gray-700 hover:bg-gray-100 border-b-gray-200 mb-[1px]"
+                                )}
+                            >
+                                {unit.name}
+                            </button>
+                        ))}
+                        <button
+                            onClick={() => setSelectedUnitId('none')}
+                            className={cn(
+                                "px-4 py-2 text-sm font-medium rounded-t-lg border-t border-l border-r border-transparent transition-colors",
+                                selectedUnitId === 'none'
+                                    ? "bg-white border-gray-200 text-blue-600 border-b-white translate-y-[1px]"
+                                    : "bg-gray-50 text-gray-500 hover:text-gray-700 hover:bg-gray-100 border-b-gray-200 mb-[1px]"
+                            )}
+                        >
+                            未所属
+                        </button>
+                        <button
+                            onClick={() => setSelectedUnitId('all')}
+                            className={cn(
+                                "px-4 py-2 text-sm font-medium rounded-t-lg border-t border-l border-r border-transparent transition-colors",
+                                selectedUnitId === 'all'
+                                    ? "bg-white border-gray-200 text-blue-600 border-b-white translate-y-[1px]"
+                                    : "bg-gray-50 text-gray-500 hover:text-gray-700 hover:bg-gray-100 border-b-gray-200 mb-[1px]"
+                            )}
+                        >
+                            全て
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Main Table */}
             <div className="overflow-auto flex-1">
                 <Table className="min-w-max border-separate border-spacing-0">
-                    <TableHeader className="sticky top-0 bg-green-50 z-30 shadow-sm">
+                    <TableHeader className="sticky top-0 bg-slate-100 z-30 shadow-sm">
                         <TableRow className="h-20">
-                            <TableHead className="w-[100px] min-w-[100px] bg-green-200/70 sticky left-0 z-30 border-r border-b text-center align-middle font-bold text-base text-black">
+                            <TableHead className="w-[100px] min-w-[100px] bg-slate-200 sticky left-0 z-30 border-r border-b text-center align-middle font-bold text-base text-slate-800">
                                 指導日
                             </TableHead>
-                            <TableHead className="w-[100px] min-w-[100px] bg-green-200/70 sticky left-[100px] z-30 border-r border-b text-center align-middle font-bold text-base text-black">
+                            <TableHead className="w-[100px] min-w-[100px] bg-slate-200 sticky left-[100px] z-30 border-r border-b text-center align-middle font-bold text-base text-slate-800">
                                 指導<br />看護師数
                             </TableHead>
-                            <TableHead className="w-[100px] min-w-[100px] bg-green-200/70 sticky left-[200px] z-30 border-r border-b text-center align-middle font-bold text-base text-black">
+                            <TableHead className="w-[100px] min-w-[100px] bg-slate-200 sticky left-[200px] z-30 border-r border-b text-center align-middle font-bold text-base text-slate-800">
                                 当日の<br />単位数
                             </TableHead>
-                            {residents?.map((r, i) => (
-                                <TableHead key={r.id} className="w-[70px] min-w-[70px] bg-green-100/70 border-r border-b text-center align-bottom p-1 text-sm text-black font-normal relative">
-                                    <div className="absolute top-1 left-1 text-xs text-gray-500 font-bold">{i + 1}</div>
-                                    <div className="writing-mode-vertical-rl h-16 w-full flex items-center justify-center mx-auto whitespace-nowrap font-medium">
-                                        {r.name}
-                                    </div>
-                                </TableHead>
-                            ))}
+                            {filteredResidents?.map((r, i) => {
+                                const unitName = units.find(u => u.id === r.unit_id)?.name
+                                return (
+                                    <TableHead key={r.id} className="w-[70px] min-w-[70px] bg-slate-100 border-r border-b text-center align-bottom p-1 text-sm text-slate-800 font-normal relative">
+                                        <div className="absolute top-1 left-1 text-xs text-slate-400 font-bold">{i + 1}</div>
+                                        <div className="writing-mode-vertical-rl h-16 w-full flex items-center justify-center mx-auto whitespace-nowrap font-medium gap-1">
+                                            <span>{r.name}</span>
+                                            {selectedUnitId === 'all' && unitName && (
+                                                <span className="text-[9px] text-gray-400">{unitName}</span>
+                                            )}
+                                        </div>
+                                    </TableHead>
+                                )
+                            })}
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {rows?.map((row) => {
-                            const d = new Date(row.date)
-                            const dayNum = d.getDate()
-                            const dayType = getDayType(d)
-                            const textColor = getDateTextColor(dayType)
+                            // Optimize: Filter dirty keys for this row only
+                            const dirtyRecordIdsStr = allPendingRecordKeys
+                                .filter(k => k.startsWith(row.date))
+                                .map(k => k.split(':')[1])
+                                .join(',')
+
                             const isDailyDirty = pendingDailies.has(row.date)
-                            const displayUnits = isDailyDirty ? getEstimatedUnits(row.nurse_count) : row.calculated_units
-                            const bgColor = dayType === 'saturday' ? 'bg-blue-50'
-                                : (dayType === 'sunday' || dayType === 'holiday') ? 'bg-red-50'
-                                    : 'bg-white'
 
                             return (
-                                <TableRow key={row.date} className="hover:bg-gray-50 h-10">
-                                    <TableCell className={`sticky left-0 z-20 border-r border-b text-center font-bold text-base p-1 ${bgColor} ${textColor}`}>
-                                        {month}/{dayNum}
-                                        {dayType === 'holiday' && <span className="text-xs ml-1">祝</span>}
-                                    </TableCell>
-                                    <TableCell className={`sticky left-[100px] z-20 border-r border-b p-0 ${isDailyDirty ? 'bg-orange-50' : 'bg-white'}`}>
-                                        <Input
-                                            type="number"
-                                            min={0}
-                                            placeholder="0"
-                                            className="h-12 w-full border border-gray-200 text-center text-lg font-medium focus-visible:ring-2 focus-visible:ring-blue-400 rounded bg-white"
-                                            value={row.nurse_count || ''}
-                                            onChange={(e) => handleDailyUpdate(row.date, e.target.value)}
-                                        />
-                                    </TableCell>
-                                    <TableCell className="sticky left-[200px] z-20 border-r border-b text-center text-lg font-medium p-0 bg-white">
-                                        {displayUnits}
-                                    </TableCell>
-                                    {residents?.map(r => {
-                                        const isChecked = row.records[r.id] || false
-                                        const isCellDirty = pendingRecords.has(`${row.date}:${r.id}`)
-                                        const isDisabled = isBeforeAdmission(row.date, r)
-
-                                        return (
-                                            <TableCell
-                                                key={r.id}
-                                                className={`p-0 border-r border-b text-center h-10 w-[70px] ${isCellDirty ? 'bg-orange-50' : ''} ${isDisabled ? 'bg-gray-100' : ''}`}
-                                                title={isDisabled ? `入居日: ${r.start_date}` : ''}
-                                            >
-                                                <div className="flex items-center justify-center h-full w-full">
-                                                    <Checkbox
-                                                        checked={isChecked}
-                                                        disabled={isDisabled}
-                                                        onCheckedChange={() => handleToggle(row.date, r.id, isChecked, r)}
-                                                        className={`h-6 w-6 border-2 rounded transition-colors ${isDisabled
-                                                                ? 'border-gray-300 bg-gray-200 cursor-not-allowed opacity-50'
-                                                                : isChecked
-                                                                    ? 'bg-green-600 border-green-600 data-[state=checked]:bg-green-600 data-[state=checked]:text-white'
-                                                                    : 'border-gray-400 hover:border-green-500'
-                                                            }`}
-                                                    />
-                                                </div>
-                                            </TableCell>
-                                        )
-                                    })}
-                                </TableRow>
+                                <MedicalVRow
+                                    key={row.date}
+                                    row={row}
+                                    month={month}
+                                    residents={filteredResidents}
+                                    isDailyDirty={isDailyDirty}
+                                    dirtyRecordIdsStr={dirtyRecordIdsStr}
+                                    targetCount={targetCount}
+                                    onDailyUpdate={handleDailyUpdate}
+                                    onToggle={handleToggle}
+                                    onDateContextMenu={handleDateContextMenu}
+                                    hasFinding={row.dailyId ? (findingsDailyPaths[row.dailyId]?.length > 0) : false}
+                                />
                             )
                         })}
                     </TableBody>
                     {/* Monthly Summary Footer */}
-                    <TableFooter className="sticky bottom-0 z-20 bg-green-100 border-t-2 border-green-300">
-                        <TableRow className="h-12">
-                            <TableCell className="sticky left-0 z-20 border-r bg-green-200/80 text-center font-bold text-base">
+                    <TableFooter className="sticky bottom-0 z-20 bg-slate-50 border-t-2 border-slate-300">
+                        <TableRow className="h-12 bg-slate-50 hover:bg-slate-50">
+                            <TableCell className="sticky left-0 z-20 border-r bg-slate-100 text-center font-bold text-base text-slate-800">
                                 月間合計
                             </TableCell>
-                            <TableCell className="sticky left-[100px] z-20 border-r bg-green-200/80 text-center font-bold text-lg">
+                            <TableCell className="sticky left-[100px] z-20 border-r bg-slate-100 text-center font-bold text-lg text-slate-800">
                                 {monthlyTotals.totalNurses}
                             </TableCell>
-                            <TableCell className="sticky left-[200px] z-20 border-r bg-green-200/80 text-center font-bold text-lg text-blue-700">
+                            <TableCell className="sticky left-[200px] z-20 border-r bg-slate-100 text-center font-bold text-lg text-blue-600">
                                 {monthlyTotals.totalUnits.toLocaleString()}
                             </TableCell>
-                            {residents?.map(r => (
-                                <TableCell key={r.id} className="text-center font-bold text-sm bg-green-100/80 border-r">
+                            {filteredResidents?.map(r => (
+                                <TableCell key={r.id} className="text-center font-bold text-sm bg-slate-50 border-r text-slate-700">
                                     {monthlyTotals.residentCounts[r.id] || 0}
                                 </TableCell>
                             ))}
@@ -350,6 +374,24 @@ export function MedicalVGrid({ residents = [], rows: initialRows = [], targetCou
                     </TableFooter>
                 </Table>
             </div>
+
+            {/* Finding Sheet for date column */}
+            <FindingSheet
+                isOpen={findingState.isOpen}
+                onClose={() => {
+                    setFindingState(prev => ({ ...prev, isOpen: false }))
+                    // Refresh indicator after closing
+                    if (findingState.dailyId) {
+                        getFindingsPathsByRecordId(findingState.dailyId, 'medical_v_daily').then((pathsMap) => {
+                            setFindingsDailyPaths(prev => ({ ...prev, ...pathsMap }))
+                        })
+                    }
+                }}
+                recordId={findingState.dailyId}
+                jsonPath="date"
+                label={findingState.label}
+                recordType="medical_v_daily"
+            />
         </div>
     )
 }

@@ -136,6 +136,7 @@ export interface Database {
                     start_date: string | null
                     end_date: string | null
                     display_id: number | null
+                    unit_id: string | null
                     created_at: string
                     updated_at: string
                 }

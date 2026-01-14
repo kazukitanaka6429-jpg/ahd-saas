@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -53,8 +54,16 @@ export default function LoginPage() {
         <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
             <Card className="w-full max-w-md">
                 <CardHeader className="space-y-1">
-                    <CardTitle className="text-2xl font-bold text-center">
-                        介護帳票システム
+                    <CardTitle className="flex justify-center py-4">
+                        <div className="relative h-12 w-full max-w-[200px]">
+                            <Image
+                                src="/logo_final.png"
+                                alt="Yorisol"
+                                fill
+                                className="object-contain"
+                                priority
+                            />
+                        </div>
                     </CardTitle>
                     <CardDescription className="text-center">
                         メールアドレスとパスワードを入力してください

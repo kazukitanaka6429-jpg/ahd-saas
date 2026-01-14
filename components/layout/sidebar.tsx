@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { FacilitySwitcher } from '@/components/common/facility-switcher'
@@ -151,18 +152,18 @@ export function Sidebar({ role, facilityName, hasMultipleAccounts }: { role?: st
     // 権限チェック関数 (omitted unchanged parts...)
 
     if (!isMounted) {
-        return <div className="h-screen w-64 border-r bg-gray-50/40" />
+        return <div className="h-screen w-64 border-r border-sidebar-border bg-sidebar" />
     }
 
     // Reuse hasAccess logic from original file... 
     const hasAccess = (item: SidebarItem) => {
-        // Admin only check
+        // Admin only check (HQ only - Manager cannot access)
         if (item.adminOnly) {
-            return role === ROLES.HQ || role === ROLES.MANAGER
+            return role === ROLES.HQ
         }
-        // Staff restrictions
+        // Staff restrictions - Medical IV and V are now allowed for staff
         if (role === ROLES.STAFF && item.href) {
-            return !['/staffs', '/residents', '/analysis', '/medical-cooperation', '/medical-v', '/hq/daily', '/admin/facilities', '/admin/qualifications'].includes(item.href)
+            return !['/staffs', '/residents', '/analysis', '/hq/daily', '/admin/facilities', '/admin/qualifications'].includes(item.href)
         }
         return true
     }
@@ -170,7 +171,7 @@ export function Sidebar({ role, facilityName, hasMultipleAccounts }: { role?: st
     return (
         <div
             className={cn(
-                "relative flex h-screen flex-col border-r bg-gray-50/40 py-8 transition-all duration-300 ease-in-out",
+                "relative flex h-full flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground py-8 transition-all duration-300 ease-in-out",
                 isCollapsed ? "w-20 px-2" : "w-64 px-4"
             )}
         >
@@ -180,24 +181,31 @@ export function Sidebar({ role, facilityName, hasMultipleAccounts }: { role?: st
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 hover:bg-gray-100"
+                        className="h-8 w-8 hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-foreground"
                         onClick={toggleSidebar}
                     >
-                        <Menu className="h-5 w-5 text-gray-600" />
+                        <Menu className="h-5 w-5" />
                     </Button>
                 </div>
 
                 <div className="flex items-center px-2">
-                    <h1 className={cn("font-bold tracking-tight text-primary transition-all duration-300", isCollapsed ? "hidden" : "text-xl")}>
-                        Care SaaS
-                    </h1>
+                    <div className={cn("transition-all duration-300", isCollapsed ? "hidden" : "block")}>
+                        <Image
+                            src="/logo_final.png"
+                            alt="ヨリソル"
+                            width={0}
+                            height={0}
+                            sizes="100vw"
+                            style={{ width: 'auto', height: '40px' }}
+                            priority
+                        />
+                    </div>
                     {!isCollapsed && (
-                        <div className="ml-2 text-xs text-gray-400 border rounded px-1 whitespace-nowrap">
+                        <div className="ml-2 text-xs text-sidebar-foreground/60 border border-sidebar-border rounded px-1 whitespace-nowrap">
                             {role === 'admin' ? '本社' : role === 'manager' ? '管理者' : '一般'}
                         </div>
                     )}
                 </div>
-
                 {!isCollapsed && (
                     <div className="flex items-center justify-between text-sm text-gray-600 bg-white/50 p-2 rounded-md border border-dashed">
                         <div className="w-full">
@@ -228,8 +236,8 @@ export function Sidebar({ role, facilityName, hasMultipleAccounts }: { role?: st
                                     className={cn(
                                         'flex items-center gap-3 rounded-lg py-2 text-sm font-medium transition-colors justify-center px-0',
                                         pathname === child.href
-                                            ? 'bg-primary text-primary-foreground'
-                                            : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900',
+                                            ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                                            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
                                     )}
                                 >
                                     <child.icon className="h-4 w-4 shrink-0" />
@@ -248,7 +256,7 @@ export function Sidebar({ role, facilityName, hasMultipleAccounts }: { role?: st
                                     <Button
                                         variant="ghost"
                                         className={cn(
-                                            "w-full justify-between hover:bg-gray-100 px-3 py-2 h-auto font-normal",
+                                            "w-full justify-between hover:bg-sidebar-accent hover:text-sidebar-foreground px-3 py-2 h-auto font-normal text-sidebar-foreground/70",
                                             isCollapsed ? "hidden" : "flex"
                                         )}
                                     >
@@ -267,8 +275,8 @@ export function Sidebar({ role, facilityName, hasMultipleAccounts }: { role?: st
                                             className={cn(
                                                 'flex items-center gap-3 rounded-lg py-2 pl-9 text-sm font-medium transition-colors',
                                                 pathname === child.href
-                                                    ? 'bg-primary/10 text-primary' // サブメニューのアクティブスタイル
-                                                    : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'
+                                                    ? 'bg-sidebar-primary/10 text-sidebar-primary' // サブメニューのアクティブスタイル
+                                                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
                                             )}
                                         >
                                             <child.icon className="h-4 w-4 shrink-0" />
@@ -289,8 +297,8 @@ export function Sidebar({ role, facilityName, hasMultipleAccounts }: { role?: st
                             className={cn(
                                 'flex items-center gap-3 rounded-lg py-2 text-sm font-medium transition-colors',
                                 pathname === item.href
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900',
+                                    ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
                                 isCollapsed ? 'justify-center px-0' : 'px-3'
                             )}
                         >
@@ -316,7 +324,7 @@ export function Sidebar({ role, facilityName, hasMultipleAccounts }: { role?: st
                 <Button
                     variant="ghost"
                     className={cn(
-                        "w-full gap-3 text-gray-500 hover:text-red-600",
+                        "w-full gap-3 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-red-500",
                         isCollapsed ? "justify-center p-0" : "justify-start"
                     )}
                     onClick={handleLogout}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useTransition, useEffect, useCallback } from 'react'
 import { ResidentMatrixData, HqMatrixRow } from '@/types'
 import { upsertDailyRecordsBulk } from '@/app/(dashboard)/daily-reports/actions'
 import { upsertAndLogHqRecord } from '@/app/actions/hq/upsert-and-log'
@@ -13,6 +13,8 @@ import { Check, Loader2, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { FindingSheet } from '@/components/features/daily-report/finding-sheet'
+import { getFindingComments } from '@/app/actions/findings'
 
 interface HqCheckMatrixProps {
     data: ResidentMatrixData[]
@@ -30,7 +32,9 @@ const MatrixTable = ({
     days,
     isEditing,
     onToggle,
-    rowColors
+    rowColors,
+    onResidentContextMenu,
+    findingsResidentIds
 }: {
     data: ResidentMatrixData[],
     year: number,
@@ -39,7 +43,9 @@ const MatrixTable = ({
     days: number[],
     isEditing: boolean,
     onToggle: (residentId: string, rowKey: string, day: number, current: boolean) => void,
-    rowColors: Record<string, string>
+    rowColors: Record<string, string>,
+    onResidentContextMenu?: (e: React.MouseEvent, residentId: string, residentName: string) => void,
+    findingsResidentIds?: Set<string>
 }) => {
     return (
         <div className="overflow-auto flex-1 relative border rounded-md">
@@ -82,12 +88,23 @@ const MatrixTable = ({
 
                                 {/* Resident Name - Only for first row */}
                                 {rowIndex === 0 && (
-                                    <td rowSpan={visibleRows.length} className="border p-2 sticky left-[120px] z-10 bg-white font-bold align-top border-b-black">
+                                    <td
+                                        rowSpan={visibleRows.length}
+                                        className="border p-2 sticky left-[120px] z-10 bg-white font-bold align-top border-b-black cursor-pointer hover:bg-blue-50 relative"
+                                        onContextMenu={(e) => {
+                                            e.preventDefault()
+                                            onResidentContextMenu?.(e, resident.id, resident.name)
+                                        }}
+                                    >
                                         <div>{resident.name}</div>
                                         <div className="text-gray-500 text-[10px] mt-1">
                                             入居: {resident.start_date}<br />
                                             {resident.status !== 'in_facility' && <span className="text-red-500">({resident.status})</span>}
                                         </div>
+                                        {/* Red indicator for findings */}
+                                        {findingsResidentIds?.has(resident.id) && (
+                                            <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-bl-full pointer-events-none" />
+                                        )}
                                     </td>
                                 )}
 
@@ -163,6 +180,25 @@ export function HqCheckMatrix({ data, stayData, year, month }: HqCheckMatrixProp
     useEffect(() => {
         setOptimisticData(data)
     }, [data])
+
+    // Finding State for resident comments
+    const [findingState, setFindingState] = useState<{
+        isOpen: boolean
+        residentId: string | null
+        residentName: string
+    }>({ isOpen: false, residentId: null, residentName: '' })
+
+    // Track which residents have findings
+    const [findingsResidentIds, setFindingsResidentIds] = useState<Set<string>>(new Set())
+
+    // Handle resident name right-click
+    const handleResidentContextMenu = useCallback((e: React.MouseEvent, residentId: string, residentName: string) => {
+        setFindingState({
+            isOpen: true,
+            residentId,
+            residentName
+        })
+    }, [])
 
     const handleTabChange = (value: string) => {
         const params = new URLSearchParams(searchParams)
@@ -414,6 +450,8 @@ export function HqCheckMatrix({ data, stayData, year, month }: HqCheckMatrixProp
                         isEditing={isEditing}
                         onToggle={handleToggle}
                         rowColors={rowColors}
+                        onResidentContextMenu={handleResidentContextMenu}
+                        findingsResidentIds={findingsResidentIds}
                     />
                 </TabsContent>
 
@@ -427,6 +465,8 @@ export function HqCheckMatrix({ data, stayData, year, month }: HqCheckMatrixProp
                         isEditing={isEditing}
                         onToggle={handleToggle}
                         rowColors={rowColors}
+                        onResidentContextMenu={handleResidentContextMenu}
+                        findingsResidentIds={findingsResidentIds}
                     />
                 </TabsContent>
 
@@ -441,6 +481,33 @@ export function HqCheckMatrix({ data, stayData, year, month }: HqCheckMatrixProp
                     保存中...
                 </div>
             )}
+
+            {/* Finding Sheet for resident comments */}
+            <FindingSheet
+                isOpen={findingState.isOpen}
+                onClose={() => {
+                    // Update red indicator after closing
+                    if (findingState.residentId) {
+                        getFindingComments(findingState.residentId, 'hq_memo', 'resident').then((comments) => {
+                            const hasUnresolved = comments.some((c: any) => !c.is_resolved)
+                            setFindingsResidentIds(prev => {
+                                const newSet = new Set(prev)
+                                if (hasUnresolved) {
+                                    newSet.add(findingState.residentId!)
+                                } else {
+                                    newSet.delete(findingState.residentId!)
+                                }
+                                return newSet
+                            })
+                        })
+                    }
+                    setFindingState(prev => ({ ...prev, isOpen: false }))
+                }}
+                recordId={findingState.residentId}
+                jsonPath="hq_memo"
+                label={`本社メモ - ${findingState.residentName}`}
+                recordType="resident"
+            />
         </div>
     )
 }

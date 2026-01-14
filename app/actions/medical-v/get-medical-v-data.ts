@@ -2,6 +2,9 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentStaff } from '@/lib/auth-helpers'
+import { protect } from '@/lib/auth-guard'
+import { logger } from '@/lib/logger'
+import { translateError } from '@/lib/error-translator'
 
 export type MedicalVDaily = {
     id: string
@@ -11,126 +14,188 @@ export type MedicalVDaily = {
 }
 
 export type MedicalVRecord = {
+    id: string
     resident_id: string
     is_executed: boolean
 }
 
 export type MedicalVData = {
-    dailyId?: string
+    dailyId?: string  // ID for nurse_count finding comments
     date: string
     nurse_count: number
     calculated_units: number
     records: Record<string, boolean> // resident_id -> is_executed
+    recordIds?: Record<string, string> // resident_id -> record_id (for finding comments)
 }
 
 export async function getMedicalVData(year: number, month: number, facilityIdArg?: string) {
-    const staff = await getCurrentStaff()
-    if (!staff) throw new Error('Unauthorized')
+    try {
+        await protect()
 
-    const supabase = await createClient()
-    let facilityId = staff.facility_id
+        const staff = await getCurrentStaff()
+        if (!staff) return { error: '認証が必要です' }
 
-    // SaaS Logic: Admin check
-    if (staff.role === 'admin' && staff.facility_id === null) {
-        if (facilityIdArg) {
-            // Security: Check Org Membership
-            const { data: facil } = await supabase.from('facilities').select('organization_id').eq('id', facilityIdArg).single()
+        const supabase = await createClient()
+        let facilityId = staff.facility_id
 
-            if (!facil || facil.organization_id !== staff.organization_id) {
-                throw new Error('Unauthorized Facility Access')
-            }
+        // SaaS Logic: Admin check (Allow all admins to switch)
+        if (staff.role === 'admin') {
+            if (facilityIdArg) {
+                // Security: Check Org Membership
+                const { data: facil } = await supabase.from('facilities').select('organization_id').eq('id', facilityIdArg).single()
 
-            facilityId = facilityIdArg
-        } else {
-            // SERVER-SIDE: Auto-select first facility for Admin
-            const { data: facilities } = await supabase
-                .from('facilities')
-                .select('id')
-                .eq('organization_id', staff.organization_id)
-                .limit(1)
+                if (!facil || facil.organization_id !== staff.organization_id) {
+                    return { error: '権限のない施設です' }
+                }
 
-            if (facilities && facilities.length > 0) {
-                facilityId = facilities[0].id
+                facilityId = facilityIdArg
             } else {
-                return { residents: [], rows: [], targetCount: 0 }
+                // SERVER-SIDE: Auto-select first facility for Admin
+                const { data: facilities } = await supabase
+                    .from('facilities')
+                    .select('id')
+                    .eq('organization_id', staff.organization_id)
+                    .limit(1)
+
+                if (facilities && facilities.length > 0) {
+                    facilityId = facilities[0].id
+                } else {
+                    return { residents: [], rows: [], targetCount: 0 }
+                }
             }
+        } else {
+            // Staff/Manager validation
+            if (facilityIdArg && facilityIdArg !== staff.facility_id) {
+                logger.warn('Unauthorized facility access attempt by staff', {
+                    staffId: staff.id,
+                    targetFacility: facilityIdArg
+                })
+            }
+            facilityId = staff.facility_id
         }
-    } else {
-        // Staff/Manager validation
-        if (facilityIdArg && facilityIdArg !== staff.facility_id) {
-            console.warn('Unauthorized facility access attempt by staff')
+
+        if (!facilityId) return { error: '施設情報がありません' }
+
+        // 1. Calculate Date Range
+        const startDateStr = `${year}-${String(month).padStart(2, '0')}-01`
+        const lastDayObj = new Date(year, month, 0)
+        const daysInMonth = lastDayObj.getDate()
+        const endDateStr = `${year}-${String(month).padStart(2, '0')}-${daysInMonth}`
+
+        // 2. Fetch Residents (All active OR in_facility) - Matching other pages
+        const { data: residents, error: resError } = await supabase
+            .from('residents')
+            .select('*')
+            .eq('facility_id', facilityId)
+            .neq('status', 'left') // Show all except left, to be safe. Or 'in_facility' if strict.
+            // Using 'neq left' to match other pages behavior if possible, or keeping 'in_facility' if that's the requirement.
+            // Previous code used 'in_facility'. Let's stick to it or broaden if "disappeared" means they are hospitalized?
+            // User complained "residents disappeared". If they are not 'in_facility', they disappear.
+            // Let's broaden to 'neq left' to be safe, like Medical IV.
+            .neq('status', 'left')
+            .order('display_id', { ascending: true, nullsFirst: false })
+
+        if (resError) {
+            logger.error('Error fetching residents:', resError)
+            return { error: '利用者情報の取得に失敗しました' }
         }
-        facilityId = staff.facility_id
-    }
 
-    if (!facilityId) throw new Error('Facility ID missing')
+        if (!residents) return { residents: [], rows: [], targetCount: 0 }
 
-    // 1. Calculate Date Range (String based to avoid timezone shift)
-    const startDateStr = `${year}-${String(month).padStart(2, '0')}-01`
+        // 3. Count Target Residents (sputum_suction = true)
+        const targetCount = residents.filter(r => r.sputum_suction).length
 
-    // Get last day of month
-    // new Date(year, month, 0) handles month rollover correctly. 
-    // e.g. year=2025, month=12 -> new Date(2025, 12, 0) is Dec 31, 2025.
-    const lastDayObj = new Date(year, month, 0)
-    const daysInMonth = lastDayObj.getDate()
-    const endDateStr = `${year}-${String(month).padStart(2, '0')}-${daysInMonth}`
+        // 4. Fetch NEW Daily Data Structure
+        // A. Fetch Execution Records (medical_coord_v_records)
+        const { data: recordsData, error: recordsError } = await supabase
+            .from('medical_coord_v_records')
+            .select('id, date, resident_id') // Include id for finding comments
+            .eq('facility_id', facilityId)
+            .gte('date', startDateStr)
+            .lte('date', endDateStr)
+            .limit(10000)
 
-    // 2. Fetch Residents (All active)
-    const { data: residents } = await supabase
-        .from('residents')
-        .select('*')
-        .eq('facility_id', facilityId)
-        .eq('status', 'in_facility')
-        .order('display_id', { ascending: true, nullsFirst: false })
+        if (recordsError) {
+            logger.error('Error fetching medical V records:', recordsError)
+            return { error: '記録の取得に失敗しました' }
+        }
 
-    if (!residents) return { residents: [], rows: [], targetCount: 0 }
 
-    // 3. Count Target Residents (sputum_suction = true)
-    // Note: Assuming 'sputum_suction' corresponds to the requirement "当月喀痰吸引が必要な利用者数"
-    // Ideally this should check historical status, but using current status as baseline.
-    const targetCount = residents.filter(r => r.sputum_suction).length
+        // DIAGNOSTIC LOG
+        console.log('[MedicalV] Records fetched:', recordsData?.length || 0, 'for facility:', facilityId)
 
-    // 4. Fetch Daily Data
-    const { data: dailyData } = await supabase
-        .from('medical_coord_v_daily')
-        .select(`
-            *,
-            medical_coord_v_records (
-                resident_id,
-                is_executed
-            )
-        `)
-        .eq('facility_id', facilityId)
-        .gte('date', startDateStr)
-        .lte('date', endDateStr)
+        // B. Fetch Daily Data (medical_coord_v_daily) for manually saved nurse counts
+        const { data: dailyData, error: dailyError } = await supabase
+            .from('medical_coord_v_daily')
+            .select('id, date, nurse_count, calculated_units')  // Include id for finding comments
+            .eq('facility_id', facilityId)
+            .gte('date', startDateStr)
+            .lte('date', endDateStr)
+            .limit(10000)
 
-    // 5. Construct Rows for each day
-    const rows: MedicalVData[] = []
+        if (dailyError) {
+            logger.error('Error fetching daily data:', dailyError)
+        }
 
-    for (let day = 1; day <= daysInMonth; day++) {
-        const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+        console.log('[MedicalV] Daily data fetched:', dailyData?.length || 0)
 
-        const existingDaily = dailyData?.find(d => d.date === dateStr)
+        // 5. Construct Rows for each day
+        const rows: MedicalVData[] = []
 
-        const recordMap: Record<string, boolean> = {}
-        if (existingDaily && existingDaily.medical_coord_v_records) {
-            existingDaily.medical_coord_v_records.forEach((r: any) => {
-                recordMap[r.resident_id] = r.is_executed
+        // Map daily data by date
+        const dailyMap = new Map<string, { id: string, nurse_count: number, calculated_units: number }>()
+        dailyData?.forEach(d => {
+            dailyMap.set(d.date, { id: d.id, nurse_count: d.nurse_count, calculated_units: d.calculated_units })
+        })
+
+        const dailyRecordsMap = new Map<string, Map<string, string>>() // date -> Map<resident_id, record_id>
+
+        recordsData?.forEach(r => {
+            if (!dailyRecordsMap.has(r.date)) {
+                dailyRecordsMap.set(r.date, new Map())
+            }
+            dailyRecordsMap.get(r.date)?.set(r.resident_id, r.id)
+        })
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+
+            // Get nurse count and calculated units from daily table (manual input)
+            const daily = dailyMap.get(dateStr)
+            const nurseCount = daily?.nurse_count || 0
+            const calculatedUnits = daily?.calculated_units || 0
+
+            // Reconstruct record map
+            const recordMap: Record<string, boolean> = {}
+            const recordIdsMap: Record<string, string> = {}
+            const residentRecords = dailyRecordsMap.get(dateStr)
+
+            residents.forEach(r => {
+                if (residentRecords && residentRecords.has(r.id)) {
+                    recordMap[r.id] = true
+                    recordIdsMap[r.id] = residentRecords.get(r.id)!
+                } else {
+                    recordMap[r.id] = false
+                }
+            })
+
+            rows.push({
+                dailyId: daily?.id, // ID for finding comments on nurse_count
+                date: dateStr,
+                nurse_count: nurseCount,
+                calculated_units: calculatedUnits, // From daily table
+                records: recordMap,
+                recordIds: recordIdsMap
             })
         }
 
-        rows.push({
-            dailyId: existingDaily?.id,
-            date: dateStr,
-            nurse_count: existingDaily ? existingDaily.nurse_count : 0,
-            calculated_units: existingDaily ? existingDaily.calculated_units : 0,
-            records: recordMap
-        })
-    }
-
-    return {
-        residents,
-        rows,
-        targetCount
+        return {
+            residents,
+            rows,
+            targetCount
+        }
+    } catch (e) {
+        logger.error('Unexpected error in getMedicalVData', e)
+        return { error: '予期せぬエラーが発生しました' }
     }
 }

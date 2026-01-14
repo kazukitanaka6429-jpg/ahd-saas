@@ -1,10 +1,17 @@
 import { getMedicalVData } from '@/app/actions/medical-v/get-medical-v-data'
+import { getUnits } from '@/app/actions/units'
+import { requireAuth } from '@/lib/auth-helpers'
 import { MedicalVGrid } from '@/components/features/medical-v/medical-v-grid'
 import { MonthSelector } from '@/components/medical-v/month-selector'
+import { FacilitySwitcher } from '@/components/common/facility-switcher'
 
 import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
+
+import { cookies } from 'next/headers'
+
+// ... existing imports ...
 
 export default async function MedicalVPage({
     searchParams,
@@ -12,12 +19,34 @@ export default async function MedicalVPage({
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
     const sp = await searchParams
+    const staff = await requireAuth()
+
+    // Cookie Store can't be awaited inside a sync parameter destructing context, wait... 
+    // This is async function component. OK.
+
     const today = new Date()
     const year = sp.year ? parseInt(sp.year as string) : today.getFullYear()
     const month = sp.month ? parseInt(sp.month as string) : today.getMonth() + 1
-    const facilityId = (sp.facility_id as string) || undefined
 
-    const data = await getMedicalVData(year, month, facilityId)
+    // Determine Facility ID
+    const facilityIdFromUrl = typeof sp.facility_id === 'string' ? sp.facility_id : undefined
+
+    // Cookie
+    const cookieStore = await cookies()
+    const facilityIdFromCookie = cookieStore.get('selected_facility_id')?.value
+
+    let facilityId: string | null | undefined = staff?.facility_id
+
+    if (staff?.role === 'admin') {
+        facilityId = facilityIdFromUrl || facilityIdFromCookie || staff.facility_id
+    } else {
+        facilityId = staff?.facility_id || facilityIdFromUrl || facilityIdFromCookie
+    }
+
+    const [data, unitsRes] = await Promise.all([
+        getMedicalVData(year, month, facilityId || undefined),
+        getUnits()
+    ])
     const { residents, rows, targetCount } = data
 
     // Verify facility Logic (Reuse from before or rely on action)
@@ -31,7 +60,7 @@ export default async function MedicalVPage({
 
     let resolvedFacilityId = facilityId
     // If admin and no param, action selected first.
-    if (!resolvedFacilityId && residents.length > 0) {
+    if (!resolvedFacilityId && residents && residents.length > 0) {
         resolvedFacilityId = residents[0].facility_id
     }
 
@@ -45,6 +74,9 @@ export default async function MedicalVPage({
                     <p className="text-sm text-gray-500 mt-1">
                         指導看護師数と実施記録を入力し、請求単位数を自動計算します。
                     </p>
+                    <div className="mt-2 text-left">
+                        <FacilitySwitcher variant="header" />
+                    </div>
                 </div>
                 <div className="flex items-center gap-4">
                     <div className="flex flex-col items-end gap-1">
@@ -54,11 +86,12 @@ export default async function MedicalVPage({
             </div>
 
             <MedicalVGrid
-                residents={residents}
-                rows={rows}
-                targetCount={targetCount}
+                residents={residents || []}
+                rows={rows || []}
+                targetCount={targetCount || 0}
                 currentDate={`${year}-${String(month).padStart(2, '0')}-01`}
-                facilityId={resolvedFacilityId}
+                facilityId={resolvedFacilityId || undefined}
+                units={unitsRes.data || []}
             />
         </div>
     )

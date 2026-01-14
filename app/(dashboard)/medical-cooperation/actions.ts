@@ -3,6 +3,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getCurrentStaff } from '@/lib/auth-helpers'
+import { protect } from '@/lib/auth-guard'
+import { logger } from '@/lib/logger'
+import { translateError } from '@/lib/error-translator'
 
 export async function saveMedicalCooperationRecord(
     residentId: string,
@@ -20,7 +23,12 @@ export async function saveMedicalCooperationRecord(
     // If staffId is provided, upsert.
     // If staffId is null, delete properly.
 
+    // If staffId is provided, upsert.
+    // If staffId is null, delete properly.
+
     try {
+        await protect()
+
         if (!staffId) {
             // Delete record if exists
             const { error } = await supabase
@@ -52,8 +60,8 @@ export async function saveMedicalCooperationRecord(
         revalidatePath('/medical-cooperation')
         return { success: true }
     } catch (error: any) {
-        console.error('Save Error:', error)
-        return { error: error.message }
+        logger.error('Save Error:', error)
+        return { error: '予期せぬエラーが発生しました' }
     }
 }
 
@@ -67,6 +75,8 @@ export async function saveMedicalCooperationRecordsBulk(
     const supabase = await createClient()
 
     try {
+        await protect()
+
         const toDelete = records.filter(r => !r.staffId)
         const toUpsert = records.filter(r => r.staffId)
 
@@ -102,7 +112,7 @@ export async function saveMedicalCooperationRecordsBulk(
         revalidatePath('/medical-cooperation')
         return { success: true }
     } catch (error: any) {
-        console.error('Bulk Save Error:', error)
-        return { error: error.message }
+        logger.error('Bulk Save Error:', error)
+        return { error: '予期せぬエラーが発生しました' }
     }
 }

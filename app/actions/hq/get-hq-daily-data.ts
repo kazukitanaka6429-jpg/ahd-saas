@@ -1,55 +1,102 @@
 'use server'
 
 import { Resident, DailyRecord, DailyShift, DbTables, DailyRecordData, ExternalBillingImport, ResidentMatrixData, HqMatrixRow } from '@/types'
+import { SupabaseClient } from '@supabase/supabase-js'
+import { Database } from '@/types/database'
+
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentStaff } from '@/lib/auth-helpers'
+import { protect } from '@/lib/auth-guard'
+import { logger } from '@/lib/logger'
+import { translateError } from '@/lib/error-translator'
+import { ActionResponse, successResponse, errorResponse } from '@/lib/action-utils'
 
 type MedicalCooperationRecord = DbTables['medical_cooperation_records']['Row']
+type DailyRecordRow = DbTables['daily_records']['Row']
 
 // Types for the matrix are imported from '@/types'
 
 
-export async function getHqDailyData(year: number, month: number, facilityIdArg?: string) {
-    const staff = await getCurrentStaff()
-    if (!staff) throw new Error('Unauthorized')
+export async function getHqDailyData(year: number, month: number, facilityIdArg?: string): Promise<ActionResponse<ResidentMatrixData[]>> {
+    try {
+        await protect()
 
-    const supabase = await createClient()
-    let facilityId = staff.facility_id
+        const staff = await getCurrentStaff()
+        if (!staff) return successResponse([]) // Return empty array if no staff? Or error?
+        // UI probably expects just empty data if auth failed here in old logic, but let's be strict if protect() passed.
 
-    // SaaS Logic: Admin check
-    if (staff.role === 'admin' || !staff.facility_id) {
-        if (facilityIdArg) {
-            // Security: Check Organization Membership
-            const { data: facil } = await supabase
-                .from('facilities')
-                .select('organization_id')
-                .eq('id', facilityIdArg)
-                .single()
+        const supabase = await createClient()
+        let facilityId = staff.facility_id
 
-            if (!facil || facil.organization_id !== staff.organization_id) {
-                throw new Error('Unauthorized Facility Access')
-            }
+        // SaaS Logic: Admin check
+        if (staff.role === 'admin' || !staff.facility_id) {
+            if (facilityIdArg) {
+                // Security: Check Organization Membership
+                const { data: facil } = await supabase
+                    .from('facilities')
+                    .select('organization_id')
+                    .eq('id', facilityIdArg)
+                    .single()
 
-            facilityId = facilityIdArg
-        } else {
-            // Auto-select first facility for Admin
-            const { data: facilities } = await supabase
-                .from('facilities')
-                .select('id')
-                .eq('organization_id', staff.organization_id)
-                .limit(1)
+                if (!facil || facil.organization_id !== staff.organization_id) {
+                    logger.warn('Unauthorized Facility Access attempt', { staffId: staff.id, facilityIdArg })
+                    return successResponse([])
+                }
 
-            if (facilities && facilities.length > 0) {
-                facilityId = facilities[0].id
+                facilityId = facilityIdArg
             } else {
-                return []
+                // Default: Fetch ALL facilities for organization
+                // Logic change: If no facilityId is provided, we fetch data for ALL facilities.
+                // To do this, we need to bypass the single 'facilityId' variable downstream.
+                // We will use a list of facility IDs.
+
+                // For backward compatibility with the rest of the function which expects single 'facilityId',
+                // we'll need to adjust the query logic.
+                // However, the function structure relies heavily on `facilityId`.
+                // Refactoring to support multi-facility fetch in one go is complex.
+                // EASIER APPROACH: Fetch all facility IDs, then use `.in('facility_id', allIds)` in queries.
+
+                const { data: allFacilities } = await supabase
+                    .from('facilities')
+                    .select('id')
+                    .eq('organization_id', staff.organization_id)
+
+                if (!allFacilities || allFacilities.length === 0) return successResponse([])
+
+                // If we have multiple facilities and no specific selection, we want "ALL".
+                // We'll mark facilityId as specific string 'ALL' or handle logic.
+                // But downstream queries like `.eq('facility_id', facilityId)` will fail.
+                // We must change queries to `.in('facility_id', targetFacilityIds)`.
+
+                // Let's define targetFacilityIds.
+                const targetFacilityIds = allFacilities.map(f => f.id)
+
+                // NOW: We need to refactor downstream queries.
+                // This is a bigger change than just this block.
+                // But it's necessary for "All Facilities" view.
+
+                const result = await getHqDailyDataForFacilities(supabase, targetFacilityIds, year, month)
+                return successResponse(result)
             }
         }
+
+
+        if (!facilityId) {
+            logger.warn('Facility ID missing in getHqDailyData')
+            return successResponse([])
+        }
+
+        const result = await getHqDailyDataForFacilities(supabase, [facilityId], year, month)
+        return successResponse(result)
+
+    } catch (e) {
+        logger.error('Unexpected error in getHqDailyData', e)
+        return errorResponse('予期せぬエラーが発生しました')
     }
+}
 
-    if (!facilityId) throw new Error('Facility ID missing')
-
-
+// Helper function to fetch data for multiple facilities
+async function getHqDailyDataForFacilities(supabase: SupabaseClient<Database>, facilityIds: string[], year: number, month: number) {
     // 1. Calculate Date Range
     const startDate = new Date(year, month - 1, 1)
     const endDate = new Date(year, month, 0) // Last day of month
@@ -67,8 +114,8 @@ export async function getHqDailyData(year: number, month: number, facilityIdArg?
                 name
             )
         `)
-        .eq('facility_id', facilityId)
-        .order('name') as { data: (Resident & { facilities: { name: string } })[] | null }
+        .in('facility_id', facilityIds)
+        .order('display_id', { ascending: true, nullsFirst: false }) as { data: (Resident & { facilities: { name: string } })[] | null }
 
     if (!residents) return []
 
@@ -76,7 +123,7 @@ export async function getHqDailyData(year: number, month: number, facilityIdArg?
     const { data: records } = await supabase
         .from('daily_records')
         .select('*')
-        .eq('facility_id', facilityId)
+        .in('facility_id', facilityIds)
         .gte('date', startDateStr)
         .lte('date', endDateStr)
 
@@ -84,19 +131,19 @@ export async function getHqDailyData(year: number, month: number, facilityIdArg?
     const { data: csvImports } = await supabase
         .from('external_billing_imports')
         .select('*')
-        .eq('facility_id', facilityId)
+        .in('facility_id', facilityIds)
         .eq('target_month', startDateStr) // CSV is imported per month (YYYY-MM-01)
 
     // 5. Fetch Daily Shifts (for Night Shift Plus flag)
     const { data: dailyShifts } = await supabase
         .from('daily_shifts')
-        .select('date, night_shift_plus')
-        .eq('facility_id', facilityId)
+        .select('date, night_shift_plus, facility_id')
+        .in('facility_id', facilityIds)
         .gte('date', startDateStr)
         .lte('date', endDateStr)
 
-    // Helper map for shifts
-    const shiftMap = new Map((dailyShifts || []).map(s => [s.date, s.night_shift_plus]))
+    // Helper map for shifts (Key: `${date}_${facility_id}`)
+    const shiftMap = new Map((dailyShifts || []).map((s: DailyShift) => [`${s.date}_${s.facility_id}`, s.night_shift_plus]))
 
     // 4. Medical Logic Preparation
     // 4a. Get Target Qualifications
@@ -105,16 +152,16 @@ export async function getHqDailyData(year: number, month: number, facilityIdArg?
         .select('id')
         .eq('is_medical_coord_iv_target', true)
 
-    const targetQualificationIds = new Set(qualifications?.map(q => q.id) || [])
+    const targetQualificationIds = new Set(qualifications?.map((q: { id: string }) => q.id) || [])
 
     // 4b. Get Facility Staffs with Qualifications
     const { data: facilityStaffs } = await supabase
         .from('staffs')
         .select('id, qualification_id')
-        .eq('facility_id', facilityId)
+        .in('facility_id', facilityIds)
 
     const medicalStaffMap = new Map<string, boolean>()
-    facilityStaffs?.forEach(s => {
+    facilityStaffs?.forEach((s: { id: string, qualification_id: string | null }) => {
         if (s.qualification_id && targetQualificationIds.has(s.qualification_id)) {
             medicalStaffMap.set(s.id, true)
         }
@@ -124,7 +171,7 @@ export async function getHqDailyData(year: number, month: number, facilityIdArg?
     const { data: medicalRecords } = await supabase
         .from('medical_cooperation_records')
         .select('resident_id, staff_id, date, medical_coord_v_daily_id') // Added staff_id check
-        .eq('facility_id', facilityId)
+        .in('facility_id', facilityIds)
         .gte('date', startDateStr)
         .lte('date', endDateStr)
 
@@ -135,7 +182,7 @@ export async function getHqDailyData(year: number, month: number, facilityIdArg?
     // 4e. Quick Lookup for Resident Assignment (ResidentId -> Date -> StaffId)
     const residentMedicalMap = new Map<string, Map<string, string>>()
 
-    medicalRecords?.forEach((r: any) => {
+    medicalRecords?.forEach((r: MedicalCooperationRecord) => {
         // Safe cast or check
         const rec = r as MedicalCooperationRecord
         if (!rec.staff_id) return
@@ -156,12 +203,17 @@ export async function getHqDailyData(year: number, month: number, facilityIdArg?
 
     // 5. Construct Matrix
     const matrixData: ResidentMatrixData[] = residents.map((resident) => {
-        const residentDailyRecords = records?.filter(r => r.resident_id === resident.id) || []
+        const residentDailyRecords = records?.filter((r: DailyRecordRow) => r.resident_id === resident.id) || []
 
         // Find CSV records for this resident (by name match)
         // Normalize names: remove spaces
         const normName = resident.name.replace(/\s+/g, '')
-        const residentCsvRecords = csvImports?.filter(c => c.resident_name.replace(/\s+/g, '') === normName) || []
+        // Check facility ID too? CSV import table has facility_id? Yes.
+        // Filter by facility_id to avoid name collision across facilities?
+        // Yes, user can upload CSV per facility.
+        const residentCsvImports = csvImports?.filter((c: ExternalBillingImport) => c.facility_id === resident.facility_id) || []
+
+        const residentCsvRecords = residentCsvImports.filter((c: ExternalBillingImport) => c.resident_name.replace(/\s+/g, '') === normName) || []
 
         // Refined Logic Helpers
         const getDailyValues = (key: string) => {
@@ -175,8 +227,8 @@ export async function getHqDailyData(year: number, month: number, facilityIdArg?
                     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 
                     // Check for manual override in daily records first
-                    const dailyRec = residentDailyRecords.find(r => r.date === dateStr)
-                    const dailyData = (dailyRec?.data as unknown as DailyRecordData) || {}
+                    const dailyRec = residentDailyRecords.find((r: DailyRecordRow) => r.date === dateStr)
+                    const dailyData = ((dailyRec as any)?.data as unknown as DailyRecordData) || {}
                     const manualLevel = dailyData.medical_manual_level
 
                     if (manualLevel !== undefined && manualLevel !== null && manualLevel === targetLevel) {
@@ -204,7 +256,7 @@ export async function getHqDailyData(year: number, month: number, facilityIdArg?
             }
 
             // Daily Record Logic
-            residentDailyRecords.forEach(r => {
+            residentDailyRecords.forEach((r: DailyRecordRow) => {
                 const day = new Date(r.date).getDate()
                 const dailyData = (r.data as unknown as DailyRecordData) || {}
 
@@ -213,7 +265,8 @@ export async function getHqDailyData(year: number, month: number, facilityIdArg?
 
                     if (key === 'is_gh_night') {
                         // Night Shift Plus Logic
-                        const facilityPlus = shiftMap.get(r.date) || false
+                        // Use composite key lookup
+                        const facilityPlus = shiftMap.get(`${r.date}_${r.facility_id}`) || false
                         const residentStay = !!dailyData.is_gh_night
                         isActive = facilityPlus && residentStay
                     } else if (key === 'daytime_activity') {
@@ -225,7 +278,9 @@ export async function getHqDailyData(year: number, month: number, facilityIdArg?
                         }
                     } else {
                         // Safe access dynamically
-                        isActive = !!(dailyData as any)[key]
+                        if (key in dailyData) {
+                            isActive = !!dailyData[key as keyof DailyRecordData]
+                        }
                     }
 
                     values[day - 1] = isActive
@@ -237,8 +292,8 @@ export async function getHqDailyData(year: number, month: number, facilityIdArg?
         // Helper to get CSV count
         const getCsvCount = (itemNames: string[]) => {
             return residentCsvRecords
-                .filter(r => itemNames.some(name => r.item_name.includes(name)))
-                .reduce((sum, r) => sum + (r.quantity || 0), 0)
+                .filter((r: ExternalBillingImport) => itemNames.some(name => r.item_name.includes(name)))
+                .reduce((sum: number, r: ExternalBillingImport) => sum + (r.quantity || 0), 0)
         }
 
         const rows: HqMatrixRow[] = [

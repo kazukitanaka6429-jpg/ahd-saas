@@ -14,9 +14,10 @@ interface StaffShiftGridProps {
     staffs: Staff[]
     initialData?: DailyShift
     date: string
+    facilityId: string
 }
 
-export function StaffShiftGrid({ staffs, initialData, date }: StaffShiftGridProps) {
+export function StaffShiftGrid({ staffs, initialData, date, facilityId }: StaffShiftGridProps) {
     const { registerSaveNode, unregisterSaveNode, triggerGlobalSave, isSaving: isGlobalSaving, setSharedState } = useGlobalSave()
 
     const [shiftData, setShiftData] = useState<Partial<DailyShift>>(initialData || {
@@ -45,10 +46,11 @@ export function StaffShiftGrid({ staffs, initialData, date }: StaffShiftGridProp
                 night_staff_ids: cleanArray(shiftData.night_staff_ids as any[]),
             }
 
-            const result = await upsertDailyShift(date, payload)
+            const result = await upsertDailyShift(date, payload, facilityId)
             if (result?.error) {
                 console.error("Shift save failed", result.error)
-                throw new Error("Shift save failed")
+                // throw new Error(result.error) // Removed to prevent crash
+                toast.error(`保存に失敗しました: ${result.error}`)
             }
         })
         return () => unregisterSaveNode(id)

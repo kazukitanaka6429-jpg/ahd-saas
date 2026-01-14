@@ -3,17 +3,31 @@
 import { createClient } from '@/lib/supabase/server'
 import { parse } from 'csv-parse/sync'
 import iconv from 'iconv-lite'
+import { protect, requireRole } from '@/lib/auth-guard'
+import { logger } from '@/lib/logger'
+import { translateError } from '@/lib/error-translator'
+import { z } from 'zod'
+
+const BillingCsvRowSchema = z.object({
+    '利用者名': z.string().min(1, { message: '利用者名は必須です' }),
+    '利用料項目名': z.string().min(1, { message: '利用料項目名は必須です' }),
+    '数量': z.coerce.number({ invalid_type_error: '数量は数値である必要があります' }).int().nonnegative().optional().default(0),
+    '金額': z.coerce.number().optional().default(0)
+}).strip() // Remove extra columns
 
 export async function importBillingCsv(formData: FormData) {
-    const file = formData.get('file') as File
-    const facilityId = formData.get('facilityId') as string
-    const dateStr = formData.get('date') as string // YYYY-MM-DD (typically first of month)
-
-    if (!file || !facilityId || !dateStr) {
-        return { success: false, error: 'Missing required fields' }
-    }
-
     try {
+        await requireRole(['admin']) // HQ/Admin only
+
+        const file = formData.get('file') as File
+        const facilityId = formData.get('facilityId') as string
+        const dateStr = formData.get('date') as string // YYYY-MM-DD (typically first of month)
+
+        if (!file || !facilityId || !dateStr) {
+            return { success: false, error: 'Missing required fields' }
+        }
+
+
         const buffer = Buffer.from(await file.arrayBuffer())
         // Attempt to decode as Shift_JIS (common for Japanese CSVs), fallback to UTF-8 if needed logic could be added
         // but typically billing software uses Shift_JIS.
@@ -30,51 +44,50 @@ export async function importBillingCsv(formData: FormData) {
             return { success: false, error: 'No records found in CSV' }
         }
 
-        // CSV Header Mapping (Based on user requirement)
-        // B列: 利用者名 -> assumes header name is "利用者名"
-        // AB列: 利用料項目名 -> assumes header name is "利用料項目名"
-        // AD列: 数量 -> assumes header name is "数量"
-        // We need to ensure these headers exist.
+        // Validate using Zod
+        // We validate individual rows to report specific errors if needed, 
+        // or validate all at once. For bulk import, safeParse on array is good.
+        // But to give friendly error line number, map parse might be better.
 
-        // Debug first row to check headers if needed
-        const firstRow = records[0] as any
-        if (!('利用者名' in firstRow) || !('利用料項目名' in firstRow) || !('数量' in firstRow)) {
-            // Fallback: try column index if headers are variable? 
-            // But 'columns: true' relies on header row. 
-            // If headers are missing, we might need to parse without columns: true and use indices.
-            // Given the unpredictable nature, let's assume standard headers or check if keys exist.
-            // If headers are different, we might fail. 
-            // Let's assume the user provided headers in image are correct.
-            console.error("Missing expected headers", Object.keys(firstRow))
-            return { success: false, error: 'CSV format invalid: Missing 利用者名, 利用料項目名, or 数量' }
+        const validRows: z.infer<typeof BillingCsvRowSchema>[] = []
+        const errors: string[] = []
+
+        records.forEach((row: unknown, index: number) => {
+            const result = BillingCsvRowSchema.safeParse(row)
+            if (result.success) {
+                // Filter logic: Check if name and item exist (Validation covered it basically, but we need both)
+                // Schema requires name and item min(1).
+                validRows.push(result.data)
+            } else {
+                const errorMsg = result.error.errors.map(e => e.message).join(', ')
+                errors.push(`Row ${index + 1}: ${errorMsg}`)
+            }
+        })
+
+        if (errors.length > 0) {
+            // If strictly ensuring integrity, fail on any error?
+            // Or log warning? "3 integrity risks" -> Strict is better.
+            logger.warn('CSV Validation Errors', errors)
+            return { success: false, error: `CSV形式エラー(${errors.length}件): ${errors[0]} ...` }
+        }
+
+        if (validRows.length === 0) {
+            return { success: false, error: '有効なデータがありません' }
         }
 
         const supabase = await createClient()
 
-        // Prepare data for insertion
-        const importsToInsert = records.map((row: any) => {
-            const quantity = parseInt(row['数量'] || '0', 10)
-            const amount = parseInt(row['金額'] || '0', 10) // Optional, using 0 if not present
-
-            // Mapping Logic (Filtering relevant items)
-            // We only care about: 朝食, 昼食, 夕食, 日中活動, 夜勤加配
-            // But we store everything or filter? 
-            // The requirement says "CSVの項目名と...紐付けて集計".
-            // It's safer to store cleaned item name.
-
+        // Prepare data for insertion (Typos fixed, types safe)
+        const importsToInsert = validRows.map(row => {
             return {
                 facility_id: facilityId,
                 target_month: dateStr,
                 resident_name: row['利用者名'],
                 item_name: row['利用料項目名'],
-                quantity: isNaN(quantity) ? 0 : quantity,
-                amount: isNaN(amount) ? 0 : amount
+                quantity: row['数量'],
+                amount: row['金額']
             }
-        }).filter((item: any) => item.resident_name && item.item_name)
-
-        if (importsToInsert.length === 0) {
-            return { success: false, error: 'No valid data extracted' }
-        }
+        })
 
         // Wash-Replace Strategy
         // 1. Delete existing for this month/facility
@@ -84,8 +97,8 @@ export async function importBillingCsv(formData: FormData) {
             .match({ facility_id: facilityId, target_month: dateStr })
 
         if (deleteError) {
-            console.error('Delete error', deleteError)
-            throw new Error('Failed to clear old data')
+            logger.error('Delete error', deleteError)
+            return { success: false, error: 'Failed to clear old data' }
         }
 
         // 2. Insert new
@@ -94,14 +107,14 @@ export async function importBillingCsv(formData: FormData) {
             .insert(importsToInsert)
 
         if (insertError) {
-            console.error('Insert error', insertError)
-            throw new Error('Failed to insert new data')
+            logger.error('Insert error', insertError)
+            return { success: false, error: 'Failed to insert new data' }
         }
 
         return { success: true, count: importsToInsert.length }
 
     } catch (e: any) {
-        console.error('CSV Import Error', e)
+        logger.error('CSV Import Error', e)
         return { success: false, error: e.message }
     }
 }

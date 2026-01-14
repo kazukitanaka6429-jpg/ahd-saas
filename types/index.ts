@@ -13,6 +13,21 @@ export type Staff = DbTables['staffs']['Row'] & {
     qualification_name?: string
 }
 
+export type StaffWithFacility = Staff & {
+    facilities: {
+        name: string
+    } | null
+}
+
+export type StaffWithRelations = Staff & {
+    facilities: {
+        name: string
+    } | null
+    qualifications: {
+        name: string
+    } | null
+}
+
 export type Resident = DbTables['residents']['Row']
 
 // Daily Record (with Typed Data JSONB)
@@ -134,4 +149,10 @@ export type ResidentStayData = {
     facilityName: string
     enrollmentDays: number
     periods: (StayPeriod | null)[]
+}
+
+export interface ShortStayRow {
+    residentId: string
+    residentName: string
+    records: Record<string, ShortStayRecord | null>
 }

@@ -26,6 +26,7 @@ import { createResident, updateResident, ResidentInput } from '@/app/actions/res
 import { toast } from "sonner"
 import { createClient } from '@/lib/supabase/client'
 import { Facility } from '@/types'
+import { getUnits, Unit } from '@/app/actions/units'
 
 interface ResidentFormDialogProps {
     currentStaff?: any;
@@ -44,19 +45,42 @@ export function ResidentFormDialog({ currentStaff, initialData, trigger, open: c
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [facilities, setFacilities] = useState<Facility[]>([])
+    const [units, setUnits] = useState<Unit[]>([])
+    // New: Track selected facility ID to filter units
+    const [selectedFacilityId, setSelectedFacilityId] = useState<string | undefined>(
+        initialData?.facility_id || currentStaff?.facility_id
+    )
 
     const isEdit = !!initialData
 
     useEffect(() => {
-        const fetchFacilities = async () => {
+        const fetchData = async () => {
             const supabase = createClient()
+            // Admin: Fetch Facilities
             if (currentStaff?.role === 'admin') {
                 const { data } = await supabase.from('facilities').select('*')
                 if (data) setFacilities(data)
             }
         }
-        if (open) fetchFacilities()
+        if (open) fetchData()
     }, [open, currentStaff])
+
+    // Fetch units whenever selectedFacilityId changes
+    useEffect(() => {
+        const fetchUnitsData = async () => {
+            if (!selectedFacilityId) {
+                setUnits([])
+                return
+            }
+            const unitRes = await getUnits(selectedFacilityId) // Pass facilityId
+            if (unitRes.data) setUnits(unitRes.data)
+        }
+        if (open) fetchUnitsData()
+    }, [open, selectedFacilityId])
+
+    const handleFacilityChange = (value: string) => {
+        setSelectedFacilityId(value)
+    }
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
@@ -67,11 +91,13 @@ export function ResidentFormDialog({ currentStaff, initialData, trigger, open: c
 
         // Map form data to ResidentInput
         const displayIdValue = formData.get('display_id') as string
+        const unitIdValue = formData.get('unit_id') as string // 'none' or UUID or null
         const payload: ResidentInput = {
             facility_id: formData.get('facility_id') as string || undefined,
+            unit_id: (unitIdValue && unitIdValue !== 'none') ? unitIdValue : null,
             display_id: displayIdValue ? parseInt(displayIdValue) : undefined,
             name: formData.get('name') as string,
-            status: formData.get('status') as any,
+            status: formData.get('status') as 'in_facility' | 'hospitalized' | 'home_stay' | 'left' | 'deceased',
             care_level: formData.get('classification') as string || undefined, // UI uses classification
             start_date: formData.get('start_date') as string || undefined,
             // direct_debit_start_date removed as per schema
@@ -138,13 +164,31 @@ export function ResidentFormDialog({ currentStaff, initialData, trigger, open: c
                         {currentStaff?.role === 'admin' && (
                             <div className="grid grid-cols-4 items-center gap-4 mb-4">
                                 <Label htmlFor="facility_id" className="text-right col-span-1">施設</Label>
-                                <Select name="facility_id" defaultValue={initialData?.facility_id || currentStaff?.facility_id}>
+                                <Select name="facility_id" value={selectedFacilityId} onValueChange={handleFacilityChange}>
                                     <SelectTrigger className="col-span-3">
                                         <SelectValue placeholder="施設を選択" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {facilities.map(f => (
                                             <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
+                        {/* ユニット選択 (ユニットがある場合のみ表示) */}
+                        {units.length > 0 && (
+                            <div className="grid grid-cols-4 items-center gap-4 mb-4">
+                                <Label htmlFor="unit_id" className="text-right col-span-1">所属ユニット</Label>
+                                <Select name="unit_id" defaultValue={initialData?.unit_id || undefined}>
+                                    <SelectTrigger className="col-span-3">
+                                        <SelectValue placeholder="ユニットを選択 (未所属可)" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">未所属</SelectItem>
+                                        {units.map(u => (
+                                            <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>

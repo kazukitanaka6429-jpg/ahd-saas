@@ -15,7 +15,8 @@ export default async function QualificationsPage() {
         redirect('/')
     }
 
-    const qualifications = await getQualifications()
+    const { data: qualificationsData } = await getQualifications()
+    const qualifications = qualificationsData || []
 
     return (
         <div className="space-y-6">

@@ -21,15 +21,55 @@ import { validateDailyReport } from '@/lib/daily-report-validation'
 import { ValidationError, ValidationWarning } from '@/types'
 import { hasFieldError } from '@/lib/daily-report-validation'
 import { ValidationWarningModal } from './validation-warning-modal'
+import { MonthlyReportDownloadButton } from '@/components/reports/MonthlyReportDownloadButton'
+import { Unit } from '@/app/actions/units'
 
 interface DailyReportGridProps {
     residents: Resident[]
     defaultRecords: DailyRecord[]
     date: string
     findingsIndicators?: Record<string, string[]> // dailyRecordId -> [jsonPath, ...]
+    units?: Unit[]
 }
 
-export function DailyReportGrid({ residents, defaultRecords, date, findingsIndicators = {} }: DailyReportGridProps) {
+// Extracted FindingCell for performance
+const FindingCell = ({
+    residentId,
+    colKey,
+    children,
+    className = "",
+    label,
+    isDecorated,
+    hasValidationError,
+    onContextMenu
+}: {
+    residentId: string,
+    colKey: string,
+    children: React.ReactNode,
+    className?: string,
+    label: string,
+    isDecorated: boolean,
+    hasValidationError: boolean,
+    onContextMenu: (e: React.MouseEvent) => void
+}) => {
+    return (
+        <TableCell
+            className={cn(
+                "border border-black p-0 text-center align-middle h-[40px] relative bg-white",
+                className,
+                hasValidationError && "ring-2 ring-red-500 ring-inset bg-red-50"
+            )}
+            onContextMenu={onContextMenu}
+        >
+            {children}
+            {isDecorated && (
+                <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-bl-full pointer-events-none" />
+            )}
+        </TableCell>
+    )
+}
+
+export function DailyReportGrid({ residents, defaultRecords, date, findingsIndicators = {}, units = [] }: DailyReportGridProps) {
     const { registerSaveNode, unregisterSaveNode, registerValidation, unregisterValidation, triggerGlobalSave, isSaving: isGlobalSaving, getSharedState } = useGlobalSave()
 
     // Optimistic UI State
@@ -63,7 +103,6 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
         })
         setLocalData(map)
         setPendingChanges(new Map())
-        // バリデーションエラーはクリアしない（利用者がエラーを修正するまで表示を継続）
     }, [defaultRecords])
 
     // Validation function that returns current validation state
@@ -104,12 +143,11 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
     }, [registerValidation, unregisterValidation, runValidation])
 
     // localData変更時に自動でバリデーションを再実行
-    // これにより、UIでの入力変更やデータリロード時にエラー表示が更新される
     useEffect(() => {
         runValidation()
     }, [localData, runValidation])
 
-    // Register Save Function - 個別バリデーション・保存を実装
+    // Register Save Function
     useEffect(() => {
         const id = 'daily-report-grid'
         registerSaveNode(id, async () => {
@@ -118,7 +156,6 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
             const nightStaffCount = getSharedState<number>('nightStaffCount') || 0
             const nightShiftPlus = getSharedState<boolean>('nightShiftPlus') || false
 
-            // 個別にバリデーションして、保存可能なレコードを抽出
             const recordsToSave: any[] = []
             const failedResidents: string[] = []
             const savedResidentIds: string[] = []
@@ -128,7 +165,6 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
                 const record = localData.get(residentId)
                 const data = record?.data || {}
 
-                // 個別バリデーション用のレコードを作成
                 const residentRecord = {
                     residentId,
                     residentName: resident?.name || '',
@@ -144,9 +180,7 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
                     }
                 }
 
-                // この利用者だけをバリデーション
                 const result = validateDailyReport([residentRecord], nightStaffCount, nightShiftPlus)
-                // 施設レベルエラーは無視（個人エラーのみチェック）
                 const personalErrors = result.errors.filter(e => e.residentId === residentId)
 
                 if (personalErrors.length === 0) {
@@ -162,12 +196,9 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
                 }
             })
 
-            // 保存可能なレコードのみ保存
             if (recordsToSave.length > 0) {
-                // Adjust payload for new action
                 const payload = recordsToSave.map(r => ({
                     ...r,
-                    // Use cast to avoid TS duplicate property error or spread error
                     data: { ...r, ...(r.data || {}) }
                 }))
 
@@ -176,7 +207,6 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
                     console.error("Daily report save failed", result.error)
                     throw new Error(result.error)
                 }
-                // 保存成功したレコードだけpendingChangesから削除
                 setPendingChanges(prev => {
                     const newMap = new Map(prev)
                     savedResidentIds.forEach(id => newMap.delete(id))
@@ -196,7 +226,6 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
     const getValue = (residentId: string, key: keyof DailyRecord) => {
         const record = localData.get(residentId)
         if (!record) return undefined
-        // Fallback: Prioritize data JSONB because top-level columns might be missing or empty in Supabase response
         return (record.data as any)?.[key] ?? record[key]
     }
 
@@ -205,16 +234,13 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
             const newMap = new Map(prev)
             const current = newMap.get(residentId) || { resident_id: residentId, data: {} } as DailyRecord
 
-            // Mutual Exclusion Logic: is_gh vs daytime_activity
             let extraUpdates: Partial<DailyRecord> = {}
             let extraUpdatesData: Record<string, any> = {}
 
             if (column === 'is_gh' && value === true) {
-                // daytime_activity is string | null
                 extraUpdates = { daytime_activity: null }
                 extraUpdatesData = { daytime_activity: null }
             } else if (column === 'daytime_activity') {
-                // Check if value is truthy (non-empty string or true if handled as such)
                 const isTruthy = value === true || (typeof value === 'string' && value.length > 0)
                 if (isTruthy) {
                     extraUpdates = { is_gh: false }
@@ -222,8 +248,6 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
                 }
             }
 
-            // CRITICAL: Update BOTH top-level and nested data object
-            // getValue prioritizes data[key], so we must update data[key]
             const currentData = (current.data || {}) as Record<string, any>
             const updatedData = {
                 ...currentData,
@@ -244,7 +268,6 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
             const newMap = new Map(prev)
             const current = newMap.get(residentId) || {}
 
-            // Apply mutual exclusion to pending changes too
             let extraUpdates: Partial<DailyRecord> = {}
             if (column === 'is_gh' && value === true) {
                 extraUpdates = { daytime_activity: null }
@@ -267,7 +290,6 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
     const onManualSave = async () => {
         const result = await triggerGlobalSave()
 
-        // If there are warnings, show modal
         if (result.warnings && result.warnings.length > 0) {
             setPendingWarnings(result.warnings)
             setShowWarningModal(true)
@@ -277,7 +299,6 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
     const handleWarningConfirm = async () => {
         setShowWarningModal(false)
         setPendingWarnings([])
-        // Retry save with warnings skipped
         await triggerGlobalSave(true)
     }
 
@@ -286,7 +307,6 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
         setPendingWarnings([])
     }
 
-    // Helper to check if a cell has a validation error
     const hasError = (residentId: string, field: string) => hasFieldError(validationErrors, residentId, field)
 
     const handleContextMenu = (e: React.MouseEvent, residentId: string, key: string, label: string) => {
@@ -311,28 +331,17 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
     }
 
     const headerClass = "border border-black bg-gray-100 text-center font-bold text-xs p-1 h-auto align-middle"
-    const cellClass = "border border-black p-0 text-center align-middle h-[40px] relative bg-white"
     const checkboxClass = "w-5 h-5 accent-green-600 cursor-pointer"
 
-    const FindingCell = ({ residentId, colKey, children, className = "", label }: { residentId: string, colKey: string, children: React.ReactNode, className?: string, label: string }) => {
-        const show = hasFinding(residentId, colKey)
-        const hasValidationError = hasError(residentId, colKey)
-        return (
-            <TableCell
-                className={cn(
-                    cellClass,
-                    className,
-                    hasValidationError && "ring-2 ring-red-500 ring-inset bg-red-50"
-                )}
-                onContextMenu={(e) => handleContextMenu(e, residentId, colKey, label)}
-            >
-                {children}
-                {show && (
-                    <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-bl-full pointer-events-none" />
-                )}
-            </TableCell>
-        )
-    }
+    // Unit Filtering State
+    const [selectedUnitId, setSelectedUnitId] = useState<string>('all')
+
+    const filteredResidents = residents.filter(r => {
+        if (units.length === 0) return true
+        if (selectedUnitId === 'all') return true
+        if (selectedUnitId === 'none') return !r.unit_id
+        return r.unit_id === selectedUnitId
+    })
 
     return (
         <div className="rounded-md border bg-white overflow-hidden shadow-sm">
@@ -346,6 +355,49 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
                     保存
                 </Button>
             </div>
+
+            {units.length > 0 && (
+                <div className="px-4 pt-4 border-b">
+                    <div className="flex space-x-1">
+                        {units.map(unit => (
+                            <button
+                                key={unit.id}
+                                onClick={() => setSelectedUnitId(unit.id)}
+                                className={cn(
+                                    "px-4 py-2 text-sm font-medium rounded-t-lg border-t border-l border-r border-transparent transition-colors",
+                                    selectedUnitId === unit.id
+                                        ? "bg-white border-gray-200 text-blue-600 border-b-white translate-y-[1px]"
+                                        : "bg-gray-50 text-gray-500 hover:text-gray-700 hover:bg-gray-100 border-b-gray-200 mb-[1px]"
+                                )}
+                            >
+                                {unit.name}
+                            </button>
+                        ))}
+                        <button
+                            onClick={() => setSelectedUnitId('none')}
+                            className={cn(
+                                "px-4 py-2 text-sm font-medium rounded-t-lg border-t border-l border-r border-transparent transition-colors",
+                                selectedUnitId === 'none'
+                                    ? "bg-white border-gray-200 text-blue-600 border-b-white translate-y-[1px]"
+                                    : "bg-gray-50 text-gray-500 hover:text-gray-700 hover:bg-gray-100 border-b-gray-200 mb-[1px]"
+                            )}
+                        >
+                            未所属
+                        </button>
+                        <button
+                            onClick={() => setSelectedUnitId('all')}
+                            className={cn(
+                                "px-4 py-2 text-sm font-medium rounded-t-lg border-t border-l border-r border-transparent transition-colors",
+                                selectedUnitId === 'all'
+                                    ? "bg-white border-gray-200 text-blue-600 border-b-white translate-y-[1px]"
+                                    : "bg-gray-50 text-gray-500 hover:text-gray-700 hover:bg-gray-100 border-b-gray-200 mb-[1px]"
+                            )}
+                        >
+                            全て
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <div className="overflow-x-auto">
                 <Table className="min-w-[1000px] border-collapse border border-black text-sm w-full">
@@ -377,50 +429,103 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {residents.map((resident) => {
+                        {filteredResidents.map((resident) => {
                             const rId = resident.id
                             const val = (k: keyof DailyRecord) => getValue(rId, k)
                             const setVal = (k: keyof DailyRecord, v: any) => handleSave(rId, k, v)
+                            const unitName = units.find(u => u.id === resident.unit_id)?.name
 
                             return (
                                 <TableRow key={resident.id} className="divide-x divide-black border-b border-black">
                                     <TableCell className="p-2 border border-black font-bold text-center bg-white">
-                                        {resident.name}
+                                        <div className="flex flex-col items-center justify-center gap-1">
+                                            <span>{resident.name}</span>
+                                            {selectedUnitId === 'all' && unitName && (
+                                                <span className="text-[10px] bg-gray-100 px-1 rounded text-gray-500">{unitName}</span>
+                                            )}
+                                            <MonthlyReportDownloadButton
+                                                residentId={resident.id}
+                                                year={parseInt(date.split('-')[0])}
+                                                month={parseInt(date.split('-')[1])}
+                                            />
+                                        </div>
                                     </TableCell>
 
                                     {/* Meals */}
-                                    <FindingCell residentId={rId} colKey="meal_breakfast" label="朝食">
+                                    <FindingCell
+                                        residentId={rId}
+                                        colKey="meal_breakfast"
+                                        label="朝食"
+                                        isDecorated={hasFinding(rId, "meal_breakfast") || false}
+                                        hasValidationError={hasError(rId, "meal_breakfast") || false}
+                                        onContextMenu={(e) => handleContextMenu(e, rId, "meal_breakfast", "朝食")}
+                                    >
                                         <div className="flex justify-center items-center h-full">
                                             <input type="checkbox" className={checkboxClass} checked={!!val('meal_breakfast')} onChange={e => setVal('meal_breakfast', e.target.checked)} />
                                         </div>
                                     </FindingCell>
-                                    <FindingCell residentId={rId} colKey="meal_lunch" label="昼食">
+                                    <FindingCell
+                                        residentId={rId}
+                                        colKey="meal_lunch"
+                                        label="昼食"
+                                        isDecorated={hasFinding(rId, "meal_lunch") || false}
+                                        hasValidationError={hasError(rId, "meal_lunch") || false}
+                                        onContextMenu={(e) => handleContextMenu(e, rId, "meal_lunch", "昼食")}
+                                    >
                                         <div className="flex justify-center items-center h-full">
                                             <input type="checkbox" className={checkboxClass} checked={!!val('meal_lunch')} onChange={e => setVal('meal_lunch', e.target.checked)} />
                                         </div>
                                     </FindingCell>
-                                    <FindingCell residentId={rId} colKey="meal_dinner" label="夕食">
+                                    <FindingCell
+                                        residentId={rId}
+                                        colKey="meal_dinner"
+                                        label="夕食"
+                                        isDecorated={hasFinding(rId, "meal_dinner") || false}
+                                        hasValidationError={hasError(rId, "meal_dinner") || false}
+                                        onContextMenu={(e) => handleContextMenu(e, rId, "meal_dinner", "夕食")}
+                                    >
                                         <div className="flex justify-center items-center h-full">
                                             <input type="checkbox" className={checkboxClass} checked={!!val('meal_dinner')} onChange={e => setVal('meal_dinner', e.target.checked)} />
                                         </div>
                                     </FindingCell>
 
                                     {/* Day Activity - GH */}
-                                    <FindingCell residentId={rId} colKey="is_gh" label="GH(日中)">
+                                    <FindingCell
+                                        residentId={rId}
+                                        colKey="is_gh"
+                                        label="GH(日中)"
+                                        isDecorated={hasFinding(rId, "is_gh") || false}
+                                        hasValidationError={hasError(rId, "is_gh") || false}
+                                        onContextMenu={(e) => handleContextMenu(e, rId, "is_gh", "GH(日中)")}
+                                    >
                                         <div className="flex justify-center items-center h-full">
                                             <input type="checkbox" className={checkboxClass} checked={!!val('is_gh')} onChange={e => setVal('is_gh', e.target.checked)} />
                                         </div>
                                     </FindingCell>
 
                                     {/* Day Activity */}
-                                    <FindingCell residentId={rId} colKey="daytime_activity" label="日中活動">
+                                    <FindingCell
+                                        residentId={rId}
+                                        colKey="daytime_activity"
+                                        label="日中活動"
+                                        isDecorated={hasFinding(rId, "daytime_activity") || false}
+                                        hasValidationError={hasError(rId, "daytime_activity") || false}
+                                        onContextMenu={(e) => handleContextMenu(e, rId, "daytime_activity", "日中活動")}
+                                    >
                                         <div className="flex justify-center items-center h-full">
                                             <input type="checkbox" className={checkboxClass} checked={!!val('daytime_activity')} onChange={e => setVal('daytime_activity', e.target.checked)} />
                                         </div>
                                     </FindingCell>
 
                                     {/* Other Service */}
-                                    <FindingCell residentId={rId} colKey="other_welfare_service" label="その他福祉">
+                                    <FindingCell
+                                        residentId={rId}
+                                        colKey="other_welfare_service"
+                                        label="その他福祉"
+                                        isDecorated={hasFinding(rId, "other_welfare_service") || false}
+                                        hasValidationError={hasError(rId, "other_welfare_service") || false}
+                                        onContextMenu={(e) => handleContextMenu(e, rId, "other_welfare_service", "その他福祉")}
+                                    >
                                         <select
                                             className="w-full h-full border-none bg-transparent text-center text-xs focus:ring-0 appearance-none cursor-pointer"
                                             value={(val('other_welfare_service') as string) || "none"}
@@ -436,28 +541,56 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
                                     </FindingCell>
 
                                     {/* Night - GH Stay */}
-                                    <FindingCell residentId={rId} colKey="is_gh_night" label="GH泊">
+                                    <FindingCell
+                                        residentId={rId}
+                                        colKey="is_gh_night"
+                                        label="GH泊"
+                                        isDecorated={hasFinding(rId, "is_gh_night") || false}
+                                        hasValidationError={hasError(rId, "is_gh_night") || false}
+                                        onContextMenu={(e) => handleContextMenu(e, rId, "is_gh_night", "GH泊")}
+                                    >
                                         <div className="flex justify-center items-center h-full">
                                             <input type="checkbox" className={checkboxClass} checked={!!val('is_gh_night')} onChange={e => setVal('is_gh_night', e.target.checked)} />
                                         </div>
                                     </FindingCell>
 
                                     {/* Emergency */}
-                                    <FindingCell residentId={rId} colKey="emergency_transport" label="救急搬送">
+                                    <FindingCell
+                                        residentId={rId}
+                                        colKey="emergency_transport"
+                                        label="救急搬送"
+                                        isDecorated={hasFinding(rId, "emergency_transport") || false}
+                                        hasValidationError={hasError(rId, "emergency_transport") || false}
+                                        onContextMenu={(e) => handleContextMenu(e, rId, "emergency_transport", "救急搬送")}
+                                    >
                                         <div className="flex justify-center items-center h-full">
                                             <input type="checkbox" className={checkboxClass} checked={!!val('emergency_transport')} onChange={e => setVal('emergency_transport', e.target.checked)} />
                                         </div>
                                     </FindingCell>
 
                                     {/* Hospitalization */}
-                                    <FindingCell residentId={rId} colKey="hospitalization_status" label="入院">
+                                    <FindingCell
+                                        residentId={rId}
+                                        colKey="hospitalization_status"
+                                        label="入院"
+                                        isDecorated={hasFinding(rId, "hospitalization_status") || false}
+                                        hasValidationError={hasError(rId, "hospitalization_status") || false}
+                                        onContextMenu={(e) => handleContextMenu(e, rId, "hospitalization_status", "入院")}
+                                    >
                                         <div className="flex justify-center items-center h-full">
                                             <input type="checkbox" className={checkboxClass} checked={!!val('hospitalization_status')} onChange={e => setVal('hospitalization_status', e.target.checked)} />
                                         </div>
                                     </FindingCell>
 
                                     {/* Overnight */}
-                                    <FindingCell residentId={rId} colKey="overnight_stay_status" label="外泊">
+                                    <FindingCell
+                                        residentId={rId}
+                                        colKey="overnight_stay_status"
+                                        label="外泊"
+                                        isDecorated={hasFinding(rId, "overnight_stay_status") || false}
+                                        hasValidationError={hasError(rId, "overnight_stay_status") || false}
+                                        onContextMenu={(e) => handleContextMenu(e, rId, "overnight_stay_status", "外泊")}
+                                    >
                                         <div className="flex justify-center items-center h-full">
                                             <input type="checkbox" className={checkboxClass} checked={!!val('overnight_stay_status')} onChange={e => setVal('overnight_stay_status', e.target.checked)} />
                                         </div>

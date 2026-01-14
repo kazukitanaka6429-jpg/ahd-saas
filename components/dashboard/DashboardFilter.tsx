@@ -1,7 +1,7 @@
 'use client'
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { SimpleStaff } from "@/app/actions/staffs"
+import { SimpleStaff } from "@/app/actions/staff"
 import { useEffect, useState } from "react"
 
 export type FilterValues = {

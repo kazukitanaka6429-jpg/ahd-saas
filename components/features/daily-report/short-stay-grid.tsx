@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Loader2, Save, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FindingSheet } from './finding-sheet'
-import { getFindingsCountByRecord } from '@/app/actions/findings'
+import { getFindingsPathsByRecordId } from '@/app/actions/findings'
 import { useGlobalSave } from '@/components/providers/global-save-context'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
@@ -116,7 +116,8 @@ export function ShortStayGrid({ residents, record: initialRecord, date, facility
     useEffect(() => {
         if (initialRecord) {
             setFormData(initialRecord)
-            getFindingsCountByRecord(initialRecord.id, 'short_stay').then(pathsMap => {
+            // Use the correct function for single record ID lookup
+            getFindingsPathsByRecordId(initialRecord.id, 'short_stay').then(pathsMap => {
                 setFindingsPaths(pathsMap[initialRecord.id] || [])
             })
         } else {
@@ -477,7 +478,15 @@ export function ShortStayGrid({ residents, record: initialRecord, date, facility
             </div>
             <FindingSheet
                 isOpen={findingState.isOpen}
-                onClose={() => setFindingState(prev => ({ ...prev, isOpen: false }))}
+                onClose={() => {
+                    setFindingState(prev => ({ ...prev, isOpen: false }))
+                    // Refresh findings indicators after closing
+                    if (formData.id) {
+                        getFindingsPathsByRecordId(formData.id, 'short_stay').then((pathsMap: Record<string, string[]>) => {
+                            setFindingsPaths(pathsMap[formData.id!] || [])
+                        })
+                    }
+                }}
                 recordId={findingState.recordId}
                 jsonPath={findingState.jsonPath}
                 label={findingState.label}

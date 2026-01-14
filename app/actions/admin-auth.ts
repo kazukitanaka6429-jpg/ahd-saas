@@ -4,6 +4,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentStaff } from '@/lib/auth-helpers'
 import { revalidatePath } from 'next/cache'
+import { protect } from '@/lib/auth-guard'
+import { logger } from '@/lib/logger'
 
 /**
  * 既存職員にログインアカウントを発行（リンク共有方式）
@@ -13,6 +15,8 @@ import { revalidatePath } from 'next/cache'
  */
 export async function inviteStaff(email: string, staffId: string) {
     try {
+        await protect()
+
         // 1. 権限チェック
         const currentStaff = await getCurrentStaff()
         if (!currentStaff) {
@@ -94,6 +98,7 @@ export async function inviteStaff(email: string, staffId: string) {
 
             userId = existingUser.id
         } else if (createError) {
+            logger.error('Failed to create user in inviteStaff', createError)
             return { error: `アカウント作成に失敗しました: ${createError.message}` }
         } else if (!createData?.user) {
             return { error: 'ユーザーの作成に失敗しました' }
@@ -108,6 +113,7 @@ export async function inviteStaff(email: string, staffId: string) {
             .eq('id', staffId)
 
         if (updateError) {
+            logger.error('Failed to update staff record in inviteStaff', updateError)
             return { error: `職員データの更新に失敗しました: ${updateError.message}` }
         }
 
@@ -134,6 +140,7 @@ export async function inviteStaff(email: string, staffId: string) {
         }
 
     } catch (error: unknown) {
+        logger.error('Unexpected error in inviteStaff', error)
         const message = error instanceof Error ? error.message : '不明'
         return { error: `予期しないエラーが発生しました: ${message}` }
     }

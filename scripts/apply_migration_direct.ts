@@ -1,34 +1,33 @@
-
-import { Client } from 'pg'
 import fs from 'fs'
 import path from 'path'
+import { Client } from 'pg'
 import dotenv from 'dotenv'
 
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
+dotenv.config({ path: '.env.local' })
 
-const migrationFile = 'supabase/migrations/20260106013000_force_facility_notifications.sql'
+// Try to find a direct connection string
+const connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL
 
-async function main() {
-    const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL
+if (!connectionString) {
+    console.error('No POSTGRES_URL or DATABASE_URL found in .env.local')
+    console.error('Please add the "Direct connection" string from Supabase settings to .env.local as POSTGRES_URL')
+    process.exit(1)
+}
 
-    if (!dbUrl) {
-        console.error('DATABASE_URL or POSTGRES_URL not found in env')
-        // Fallback for local supabase default if not set
-        // postgresql://postgres:postgres@localhost:54322/postgres
-        console.log('Trying default local Supabase URL...')
-    }
-
+async function applyMigration() {
     const client = new Client({
-        connectionString: dbUrl || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
+        connectionString: connectionString,
+        ssl: { rejectUnauthorized: false } // Required for Supabase usually
     })
 
     try {
         await client.connect()
-        console.log('Connected to database')
+        console.log('Connected to database.')
 
-        const sql = fs.readFileSync(path.resolve(process.cwd(), migrationFile), 'utf8')
-        console.log(`Applying migration: ${migrationFile}`)
+        const migrationPath = path.join(process.cwd(), 'supabase/migrations/20260112000000_add_audit_logs.sql')
+        const sql = fs.readFileSync(migrationPath, 'utf8')
 
+        console.log('Applying migration...')
         await client.query(sql)
         console.log('Migration applied successfully!')
 
@@ -39,4 +38,4 @@ async function main() {
     }
 }
 
-main()
+applyMigration()

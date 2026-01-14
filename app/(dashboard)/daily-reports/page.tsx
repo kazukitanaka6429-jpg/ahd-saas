@@ -1,24 +1,22 @@
 import { createClient } from '@/lib/supabase/server'
 import React from 'react'
-import { DailyReportGrid } from '@/components/features/daily-report/daily-report-grid'
-import { StaffShiftGrid } from '@/components/features/daily-report/staff-shift-grid'
 import { DailyRemarks } from '@/components/features/daily-report/daily-remarks'
 import { DateSelector } from '@/components/features/daily-report/date-selector'
 import { FeedbackSection } from '@/components/features/daily-report/feedback-section'
-import { DailyReportMobileList } from '@/components/features/daily-report/daily-report-mobile'
 import { requireAuth } from '@/lib/auth-helpers'
-import { ShortStayGrid } from '@/components/features/daily-report/short-stay-grid'
-import { getFindingsCountByRecord } from '@/app/actions/findings'
-import { headers } from 'next/headers'
+import { headers, cookies } from 'next/headers'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
-import { getDailyMatrix } from '@/app/actions/daily-record'
-import { getDailyShift } from '@/app/actions/shift'
-import { getShortStayRecord } from '@/app/actions/short-stay'
-
-export const dynamic = 'force-dynamic'
 
 import { GlobalSaveProvider } from '@/components/providers/global-save-context'
+import { FacilitySwitcher } from '@/components/common/facility-switcher'
+import { ResetDailyReportButton } from '@/components/features/daily-report/reset-daily-report-button'
+
+// Streaming Components
+import { StaffShiftSection } from '@/components/features/daily-report/staff-shift-section'
+import { MainContentSection } from '@/components/features/daily-report/main-content-section'
+
+export const dynamic = 'force-dynamic'
 
 export default async function DailyReportsPage({
     searchParams,
@@ -32,9 +30,18 @@ export default async function DailyReportsPage({
     const supabase = await createClient()
 
     // For Admins (facility_id is NULL), use facility_id from URL params
-    // For regular staff, use their assigned facility_id
     const facilityIdFromUrl = typeof sp.facility_id === 'string' ? sp.facility_id : undefined
-    let facilityId = staff.facility_id || facilityIdFromUrl
+
+    const cookieStore = await cookies()
+    const facilityIdFromCookie = cookieStore.get('selected_facility_id')?.value
+
+    let facilityId: string | null | undefined = staff.facility_id
+
+    if (staff.role === 'admin') {
+        facilityId = facilityIdFromUrl || facilityIdFromCookie || staff.facility_id
+    } else {
+        facilityId = staff.facility_id || facilityIdFromUrl || facilityIdFromCookie
+    }
 
     // SERVER-SIDE: If Admin with no facility selected, auto-select first available
     if (!facilityId && staff.role === 'admin' && staff.organization_id) {
@@ -59,70 +66,21 @@ export default async function DailyReportsPage({
     const today = (typeof dateParam === 'string' ? dateParam : undefined) || new Date().toISOString().split('T')[0]
     const displayDate = format(new Date(today), 'yyyy年M月d日(EEE)', { locale: ja })
 
-    // Parallel Fetching - Use facilityId (not staff.facility_id!)
-    const [
-        matrixRes,
-        indicators,
-        { data: comments },
-        { data: staffs },
-        shiftRes,
-        shortStayRes
-    ] = await Promise.all([
-        // 1. Get Residents & Records (Matrix)
-        getDailyMatrix(today, facilityId),
-
-        // 2. Get Finding Indicators
-        getFindingsCountByRecord(today),
-
-        // 3. Get Global Feedback Comments
-        supabase
-            .from('feedback_comments')
-            .select('*')
-            .eq('facility_id', facilityId)
-            .eq('report_date', today)
-            .order('created_at', { ascending: true }),
-
-        // 4. Get Staffs (for attendance)
-        supabase
-            .from('staffs')
-            .select('*')
-            .eq('facility_id', facilityId)
-            .eq('status', 'active')
-            .order('name'),
-
-        // 5. Get Daily Shift
-        getDailyShift(today, facilityId),
-
-        // 6. Get Short Stay Record
-        getShortStayRecord(today, facilityId)
-    ])
-
-    // Extract Matrix Data
-    const residents = matrixRes.data?.residents || []
-    const dailyRecordsMap = matrixRes.data?.records || {}
-    const dailyRecords = Object.values(dailyRecordsMap)
-
-    // Extract Shift Data
-    const dailyShift = shiftRes.data
-
-    // Extract Short Stay Data
-    const shortStayRecord = shortStayRes
-
-    // Mobile Detection
-    const headersList = headers()
-    const userAgent = (await headersList).get('user-agent') || ''
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent)
+    // Feedback Comments (Lightweight, so fetch normally or could be another suspense)
+    // Decided to keep it in main shell or move to its own? 
+    // It's at the bottom, so lazy loading is perfect.
+    // Let's create a quick wrapper for Feedback or just do it inline if simple.
+    // Actually, let's just fetch it here for now as it's not the bottleneck, or move to MainContent?
+    // Let's move it to a small suspense section at bottom.
 
     return (
         <GlobalSaveProvider>
             <div className="space-y-8 pb-20 max-w-screen-xl mx-auto">
-                {/* Section A: Header */}
+                {/* Section A: Header (Immediate) */}
                 <div className="flex items-end justify-between border-b pb-4">
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-gray-900">業務日誌</h1>
-                        <p className="text-lg font-bold mt-2 text-gray-700">
-                            {staff?.facility_id ? 'ABCリビング' : '未設定'}
-                        </p>
+                        <h1 className="text-3xl font-bold tracking-tight text-gray-900 mb-1">業務日誌</h1>
+                        <FacilitySwitcher variant="header" />
                     </div>
                     <div className="flex flex-col items-end gap-2">
                         <span className="text-2xl font-bold text-gray-800">
@@ -130,51 +88,53 @@ export default async function DailyReportsPage({
                         </span>
                         <DateSelector date={today} />
                         <div className="text-sm text-gray-500 font-bold">{displayDate}</div>
+                        <ResetDailyReportButton date={today} facilityId={facilityId} />
                     </div>
                 </div>
 
-                {/* Section B: Staff Shift */}
-                <StaffShiftGrid
-                    staffs={staffs || []}
-                    initialData={dailyShift || undefined}
-                    date={today}
-                />
+                {/* Section B: Staff Shift (Suspense) */}
+                <React.Suspense fallback={
+                    <div className="p-4 border rounded bg-gray-50 h-[200px] flex items-center justify-center text-gray-400">
+                        シフト情報を読み込み中...
+                    </div>
+                }>
+                    <StaffShiftSection date={today} facilityId={facilityId} />
+                </React.Suspense>
 
-                {/* Section C: Main Grid */}
-                {isMobile ? (
-                    <DailyReportMobileList
-                        residents={residents}
-                        date={today}
-                    />
-                ) : (
-                    <DailyReportGrid
-                        residents={residents}
-                        defaultRecords={dailyRecords}
-                        date={today}
-                        findingsIndicators={indicators}
-                    />
-                )}
-
-                {/* Section D: Short Stay */}
-                {!isMobile && (
-                    <ShortStayGrid
-                        residents={residents}
-                        record={shortStayRecord}
-                        date={today}
-                        facilityId={facilityId}
-                        key={`short-${today}`}
-                    />
-                )}
+                {/* Section C: Main Grid & Short Stay (Suspense) */}
+                <React.Suspense fallback={
+                    <div className="p-4 border rounded bg-gray-50 h-[400px] flex items-center justify-center text-gray-400">
+                        日誌データを読み込み中...
+                    </div>
+                }>
+                    <MainContentSection date={today} facilityId={facilityId} />
+                </React.Suspense>
 
                 {/* Section E: Footer (Remarks) */}
                 <DailyRemarks />
 
-                {/* Extra: Feedback Section (Kept as supplementary) */}
+                {/* Extra: Feedback Section (Async Wrapper Inline or imported) */}
                 <div className="mt-8 pt-8 border-t">
                     <h3 className="text-sm font-bold text-gray-500 mb-4">全体フィードバック・連絡事項</h3>
-                    <FeedbackSection comments={comments || []} date={today} />
+                    <React.Suspense fallback={<div className="h-20 bg-gray-50 animate-pulse rounded" />}>
+                        <FeedbackSectionWrapper date={today} facilityId={facilityId} />
+                    </React.Suspense>
                 </div>
             </div>
         </GlobalSaveProvider>
     )
 }
+
+// Small inline wrapper for feedback to avoid another file if possible, or usually separate file
+async function FeedbackSectionWrapper({ date, facilityId }: { date: string, facilityId: string }) {
+    const supabase = await createClient()
+    const { data: comments } = await supabase
+        .from('feedback_comments')
+        .select('*')
+        .eq('facility_id', facilityId)
+        .eq('report_date', date)
+        .order('created_at', { ascending: true })
+
+    return <FeedbackSection comments={comments || []} date={date} />
+}
+

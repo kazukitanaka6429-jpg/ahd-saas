@@ -1,12 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { NotificationWidget } from '@/components/dashboard/NotificationWidget'
-import { FacilityNotificationWidget } from '@/components/dashboard/FacilityNotificationWidget'
+import { DashboardWidgetsWrapper } from '@/components/dashboard/dashboard-widgets-wrapper'
 
 import { getCurrentStaff } from '@/lib/auth-helpers'
 import { DebugToggle } from '@/components/common/debug-toggle'
 
 import { DebugStatus } from '@/components/common/debug-status'
+import { getDocumentAlerts } from '@/app/actions/resident-documents'
 
 // Dashboard Home Component
 export default async function Home() {
@@ -22,6 +22,9 @@ export default async function Home() {
 
   const isHQ = staff?.role === 'admin'
 
+  // Fetch document alerts for HQ users
+  const documentAlerts = isHQ ? (await getDocumentAlerts()).data : []
+
   return (
     <div className="p-8 space-y-8">
       <div>
@@ -29,15 +32,7 @@ export default async function Home() {
         <p className="text-gray-500">ようこそ、{user?.email}さん</p>
       </div>
 
-      {isHQ ? (
-        <div className="w-full">
-          <NotificationWidget />
-        </div>
-      ) : (
-        <div className="w-full">
-          <FacilityNotificationWidget />
-        </div>
-      )}
+      <DashboardWidgetsWrapper isHQ={isHQ} documentAlerts={documentAlerts} />
 
       <DebugStatus user={user} staff={staff} isHQ={isHQ} />
 

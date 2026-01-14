@@ -48,7 +48,7 @@ export function CreateNotificationModal() {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline" className="gap-2">
+                <Button variant="outline" className="gap-2 bg-white text-gray-800 hover:bg-gray-100 border-gray-300">
                     <Send className="h-4 w-4" />
                     本社へ連絡
                 </Button>

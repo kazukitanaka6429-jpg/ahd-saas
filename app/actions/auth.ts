@@ -4,91 +4,66 @@ import { createClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { Staff } from '@/types'
+import { protect } from '@/lib/auth-guard'
+import { logger } from '@/lib/logger'
+import { translateError } from '@/lib/error-translator'
+
+import { getCurrentStaff as getCurrentStaffHelper, getMyStaffIdentities } from '@/lib/auth-helpers'
 
 // Get current authenticated staff
-// Logic:
-// 1. Check Auth User
-// 2. Check 'active_staff_id' cookie -> Return if valid
-// 3. Find associated staffs -> Return specific one if single, or Admin Context if applicable
-// 4. Return null if no context determined (Caller handles redirect)
+// Logic delegated to lib/auth-helpers
 export async function getCurrentStaff(): Promise<Staff | null> {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) return null
-
-    const cookieStore = await cookies()
-    const activeStaffId = cookieStore.get('active_staff_id')?.value
-
-    // Try Cookie First
-    if (activeStaffId) {
-        const { data: staff } = await supabase
-            .from('staffs')
-            .select('*')
-            .eq('id', activeStaffId)
-            .eq('auth_user_id', user.id)
-            .single()
-
-        if (staff) return staff as unknown as Staff
-        // If cookie invalid, fall through
-    }
-
-    // Discovery Mode
-    const { data: staffs } = await supabase
-        .from('staffs')
-        .select('*')
-        .eq('auth_user_id', user.id)
-
-    if (!staffs || staffs.length === 0) return null
-
-    // If only one affiliation, use it
-    if (staffs.length === 1) {
-        const staff = staffs[0] as unknown as Staff
-        // Auto-set cookie for performance next time
-        // Note: Can't set cookie in Server Component render pass easily without Server Action context, 
-        // but this function is often called in Server Components. 
-        // We rely on 'switchFacility' for explicit switches, but imply implicit context here.
-        return staff
-    }
-
-    // Prioritize HQ Admin (Global Context) if exists
-    // Admin user has facility_id = null usually, or specific facility.
-    // If they have a "Global Admin" record (facility_id is null), use that.
-    const adminStaff = staffs.find(s => s.role === 'admin' && s.facility_id === null)
-    if (adminStaff) return adminStaff as unknown as Staff
-
-    // Ambiguous state (Multi-facility Manager/Staff without cookie)
-    // Return null to trigger selector
-    return null
+    // Pass false to suppress redirect, returning null if not found/decided
+    return getCurrentStaffHelper(false)
 }
 
 export async function switchFacility(staffId: string) {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    try {
+        await protect()
 
-    if (!user) redirect('/login')
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
 
-    // Verify ownership
-    const { data: staff } = await supabase
-        .from('staffs')
-        .select('id')
-        .eq('id', staffId)
-        .eq('auth_user_id', user.id)
-        .single()
+        if (!user) redirect('/login')
 
-    if (!staff) {
-        throw new Error('Unauthorized')
+        // Verify ownership
+        const { data: staff } = await supabase
+            .from('staffs')
+            .select('id')
+            .eq('id', staffId)
+            .eq('auth_user_id', user.id)
+            .single()
+
+        if (!staff) {
+            throw new Error('Unauthorized')
+        }
+
+        const cookieStore = await cookies()
+        cookieStore.set('active_staff_id', staffId, {
+            path: '/',
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 60 * 60 * 24 * 7 // 1 week
+        })
+    } catch (e) {
+        logger.error('switchFacility failed', e)
+        // Redirect handled by Next.js primitive (throws), so we must re-throw if it's a redirect
+        // But protect() throws regular error.
+        // Also redirect() throws NEXT_REDIRECT internal error. We must NOT catch it or rethrow it.
+        // Checking if error is digest NEXT_REDIRECT is hard in strict TS without helper.
+        // Simplest: If logic is simple, just let redirect happen.
+        // But we are inside try/catch.
+
+        // Use checking: isRedirectError is available in 'next/dist/client/components/redirect' but not exposed cleanly in server actions sometimes?
+        // Actually, protecting switchFacility which returns void/redirect is tricky with try/catch.
+        // Maybe skipping switchFacility is safer or just use protect() at top without try/catch?
+        // User asked to wrap in try/catch and log error.
+        // Converting to return type is not possible as signature is void (redirect).
+        throw e // Rethrow to allow redirect or basic error page
     }
 
-    const cookieStore = await cookies()
-    cookieStore.set('active_staff_id', staffId, {
-        path: '/',
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7 // 1 week
-    })
-
+    // Redirect must be outside try/catch if possible, or re-thrown.
     redirect('/')
 }
 
@@ -103,19 +78,16 @@ export async function signOut() {
 }
 
 export async function getStaffIdentities() {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) return []
-
-    // Join facilities to show name
-    const { data: staffs } = await supabase
-        .from('staffs')
-        .select(`
-            id, role, facility_id, organization_id, name,
-            facilities ( name )
-        `)
-        .eq('auth_user_id', user.id)
-
-    return staffs || []
+    try {
+        await protect()
+        // Use helper from lib
+        // Note: Helper returns Staff[] from DB, which matches expected shape mostly.
+        // The helper selects * + facilities(name).
+        // This function previously selected id, role, facility_id, organization_id, name, facilities(name).
+        // Since * includes these, it is compatible.
+        return await getMyStaffIdentities()
+    } catch (e) {
+        logger.error('getStaffIdentities failed', e)
+        return []
+    }
 }

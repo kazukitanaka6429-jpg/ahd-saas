@@ -13,20 +13,12 @@ import {
     TableRow,
 } from '@/components/ui/table'
 import { toast } from 'sonner'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Pencil } from 'lucide-react'
+import { DeleteButton } from '@/components/common/delete-button'
 
 export function FacilitiesGrid({ data }: { data: Facility[] }) {
-    const handleDelete = async (id: string, name: string) => {
-        if (!confirm(`施設「${name}」を削除してもよろしいですか？`)) return
+    // Delete logic moved to DeleteButton
 
-        try {
-            await deleteFacility(id)
-            toast.success('削除しました')
-        } catch (error) {
-            toast.error('削除に失敗しました')
-            console.error(error)
-        }
-    }
 
     return (
         <div className="border rounded-md">
@@ -62,14 +54,13 @@ export function FacilitiesGrid({ data }: { data: Facility[] }) {
                                                 </Button>
                                             }
                                         />
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
+                                        <DeleteButton
+                                            id={item.id}
+                                            onDelete={deleteFacility}
+                                            iconOnly
+                                            confirmMessage={`施設「${item.name}」を削除してもよろしいですか？\nこの操作は取り消せません。`}
                                             className="h-8 w-8 text-destructive hover:text-destructive"
-                                            onClick={() => handleDelete(item.id, item.name)}
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
+                                        />
                                     </div>
                                 </TableCell>
                             </TableRow>

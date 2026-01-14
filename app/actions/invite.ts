@@ -6,6 +6,9 @@ import { getCurrentStaff } from '@/lib/auth-helpers'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
+import { protect } from '@/lib/auth-guard'
+import { logger } from '@/lib/logger'
+import { translateError } from '@/lib/error-translator'
 
 /**
  * 招待リンクを生成（管理者用）
@@ -14,67 +17,75 @@ import { cookies } from 'next/headers'
  * @returns 招待URL
  */
 export async function generateInviteLink(staffId: string) {
-    // 1. 権限チェック
-    const currentStaff = await getCurrentStaff()
-    if (!currentStaff) {
-        return { error: 'ログインが必要です' }
-    }
-
-    if (currentStaff.role !== 'admin' && currentStaff.role !== 'manager') {
-        return { error: 'この操作には管理者権限が必要です' }
-    }
-
-    // 2. 対象職員の確認
-    const supabase = await createClient()
-    const { data: targetStaff, error: fetchError } = await supabase
-        .from('staffs')
-        .select('id, name, auth_user_id, facility_id')
-        .eq('id', staffId)
-        .single()
-
-    if (fetchError || !targetStaff) {
-        return { error: '職員が見つかりません' }
-    }
-
-    if (targetStaff.auth_user_id) {
-        return { error: 'この職員は既にアカウントが登録されています' }
-    }
-
-    // 施設チェック（managerは自施設のみ）
-    if (currentStaff.role === 'manager' && currentStaff.facility_id !== targetStaff.facility_id) {
-        return { error: '他施設の職員の招待リンクは発行できません' }
-    }
-
-    // 3. トークン生成・保存
-    const token = crypto.randomUUID()
-
-    let supabaseAdmin;
     try {
-        supabaseAdmin = createAdminClient()
+        await protect()
+
+        // 1. 権限チェック
+        const currentStaff = await getCurrentStaff()
+        if (!currentStaff) {
+            return { error: 'ログインが必要です' }
+        }
+
+        if (currentStaff.role !== 'admin' && currentStaff.role !== 'manager') {
+            return { error: 'この操作には管理者権限が必要です' }
+        }
+
+        // 2. 対象職員の確認
+        const supabase = await createClient()
+        const { data: targetStaff, error: fetchError } = await supabase
+            .from('staffs')
+            .select('id, name, auth_user_id, facility_id')
+            .eq('id', staffId)
+            .single()
+
+        if (fetchError || !targetStaff) {
+            return { error: '職員が見つかりません' }
+        }
+
+        if (targetStaff.auth_user_id) {
+            return { error: 'この職員は既にアカウントが登録されています' }
+        }
+
+        // 施設チェック（managerは自施設のみ）
+        if (currentStaff.role === 'manager' && currentStaff.facility_id !== targetStaff.facility_id) {
+            return { error: '他施設の職員の招待リンクは発行できません' }
+        }
+
+        // 3. トークン生成・保存
+        const token = crypto.randomUUID()
+
+        let supabaseAdmin;
+        try {
+            supabaseAdmin = createAdminClient()
+        } catch (e) {
+            logger.error('Failed to create admin client:', e)
+            return { error: 'システムエラー: 環境変数設定(SUPABASE_SERVICE_ROLE_KEY)を確認してください' }
+        }
+
+        const { error: updateError } = await supabaseAdmin
+            .from('staffs')
+            .update({ invite_token: token })
+            .eq('id', staffId)
+
+        if (updateError) {
+            logger.error('generateInviteLink token save failed', updateError)
+            return { error: `トークンの保存に失敗しました: ${updateError.message}` }
+        }
+
+        // 4. 招待URLを返却
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+        const inviteUrl = `${baseUrl}/join?token=${token}`
+
+        revalidatePath('/staffs')
+
+        return {
+            success: true,
+            url: inviteUrl,
+            staffName: targetStaff.name
+        }
     } catch (e) {
-        console.error('Failed to create admin client:', e)
-        return { error: 'システムエラー: 環境変数設定(SUPABASE_SERVICE_ROLE_KEY)を確認してください' }
-    }
-
-    const { error: updateError } = await supabaseAdmin
-        .from('staffs')
-        .update({ invite_token: token })
-        .eq('id', staffId)
-
-    if (updateError) {
-        return { error: `トークンの保存に失敗しました: ${updateError.message}` }
-    }
-
-    // 4. 招待URLを返却
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const inviteUrl = `${baseUrl}/join?token=${token}`
-
-    revalidatePath('/staffs')
-
-    return {
-        success: true,
-        url: inviteUrl,
-        staffName: targetStaff.name
+        logger.error('Unexpected error in generateInviteLink', e)
+        return { error: '予期せぬエラーが発生しました' }
     }
 }
 
@@ -92,7 +103,7 @@ export async function validateInviteToken(token: string) {
     try {
         supabaseAdmin = createAdminClient()
     } catch (e) {
-        console.error('Failed to create admin client:', e)
+        logger.error('Failed to create admin client:', e)
         return { error: 'システムエラー: 環境変数設定を確認してください' }
     }
 
@@ -161,7 +172,7 @@ export async function signUpWithToken(token: string, email: string, password: st
     try {
         supabaseAdmin = createAdminClient()
     } catch (e) {
-        console.error('Failed to create admin client:', e)
+        logger.error('Failed to create admin client:', e)
         return { error: 'システムエラー: 環境変数設定を確認してください' }
     }
 

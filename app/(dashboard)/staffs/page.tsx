@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { CheckCircle } from 'lucide-react'
 import { getCurrentStaff } from '@/app/actions/auth'
 import { redirect } from 'next/navigation'
+import { StaffWithRelations } from '@/types'
 
 export default async function StaffsPage() {
     const staff = await getCurrentStaff()
@@ -114,7 +115,7 @@ export default async function StaffsPage() {
                             {staffs?.map((s: any) => (
                                 <TableRow key={s.id}>
                                     <TableCell className="font-medium sticky left-0 bg-white z-10">{s.name}</TableCell>
-                                    <TableCell>{(s.facilities as any)?.name || '-'}</TableCell>
+                                    <TableCell>{(s as StaffWithRelations).facilities?.name || '-'}</TableCell>
                                     <TableCell>{getRoleLabel(s.role)}</TableCell>
                                     <TableCell>{getStatusLabel(s.status)}</TableCell>
                                     <TableCell>
@@ -124,7 +125,7 @@ export default async function StaffsPage() {
                                     </TableCell>
                                     <TableCell>
                                         {s.qualifications ? (
-                                            <span className="font-medium">{(s.qualifications as any).name}</span>
+                                            <span className="font-medium">{(s as StaffWithRelations).qualifications?.name}</span>
                                         ) : (
                                             <span className="text-gray-400">-</span>
                                         )}
