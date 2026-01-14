@@ -47,7 +47,21 @@ export async function getMonthlyResidentRecords(
             .eq('id', residentId)
             .single()
 
-        if (resError || !resident) return { error: '利用者が見つかりません' }
+        if (resError) {
+            logger.error('getMonthlyResidentRecords: resident query error', {
+                residentId,
+                error: resError,
+                staffId: staff.id,
+                staffRole: staff.role,
+                staffFacilityId: staff.facility_id
+            })
+            return { error: '利用者が見つかりません (DBエラー)' }
+        }
+
+        if (!resident) {
+            logger.warn('getMonthlyResidentRecords: resident not found', { residentId })
+            return { error: '利用者が見つかりません' }
+        }
 
         // Access Check
         // If staff is not admin, must belong to same facility
