@@ -79,7 +79,7 @@ export default async function DailyReportsPage({
                 {/* Section A: Header (Immediate) */}
                 <div className="flex items-end justify-between border-b pb-4">
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-gray-900 mb-1">業務日誌</h1>
+                        <h1 className="text-3xl font-bold tracking-tight text-gray-900 mb-1">📓 業務日誌</h1>
                         <FacilitySwitcher variant="header" />
                     </div>
                     <div className="flex flex-col items-end gap-2">

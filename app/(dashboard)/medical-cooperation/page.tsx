@@ -115,7 +115,7 @@ export default async function MedicalCooperationPage({
         <div className="h-full flex flex-col space-y-4 pb-8">
             <div className="flex items-center justify-between mb-2">
                 <div>
-                    <h2 className="text-2xl font-bold tracking-tight">医療連携体制加算 (医療連携IV)</h2>
+                    <h2 className="text-2xl font-bold tracking-tight">🏥 医療連携体制加算Ⅳ</h2>
                     <p className="text-muted-foreground text-sm">
                         看護職員による夜間の訪問・対応記録
                     </p>

@@ -56,7 +56,7 @@ export default async function HqDailyPage({ searchParams }: { searchParams: Prom
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-2xl font-bold flex items-center gap-2">
-                        本社日次確認画面 (HQ Daily Check)
+                        📒 一覧確認
                     </h1>
                 </div>
 

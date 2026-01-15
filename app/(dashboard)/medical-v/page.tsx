@@ -69,7 +69,7 @@ export default async function MedicalVPage({
             <div className="flex flex-col md:flex-row md:items-end justify-between border-b pb-4 gap-4">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
-                        🏥 医療連携体制加算Ⅴ (集計・記録)
+                        🏥 医療連携体制加算Ⅴ
                     </h1>
                     <p className="text-sm text-gray-500 mt-1">
                         指導看護師数と実施記録を入力し、請求単位数を自動計算します。
