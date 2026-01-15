@@ -66,7 +66,7 @@ const sidebarItems: SidebarItem[] = [
         icon: Stethoscope,
     },
     {
-        title: '本社日次確認',
+        title: '一覧確認',
         href: '/hq/daily',
         icon: ClipboardCheck,
     },
