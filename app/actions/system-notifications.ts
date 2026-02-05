@@ -156,3 +156,59 @@ export async function createSystemNotification(
         return { error: 'Unexpected error' }
     }
 }
+
+// Notify all organization admins
+export async function notifyOrganizationAdmins(
+    organizationId: string,
+    title: string,
+    content: string,
+    type: 'info' | 'warning' | 'urgent' = 'info',
+    excludeUserId?: string | null
+) {
+    try {
+        await protect()
+        const supabase = await createClient()
+
+        // 1. Find all admin users in the organization
+        const { data: adminStaffs, error: staffError } = await supabase
+            .from('staffs')
+            .select('auth_user_id')
+            .eq('organization_id', organizationId)
+            .eq('role', 'admin')
+
+        if (staffError || !adminStaffs) {
+            console.error('Error fetching admin staffs:', staffError)
+            return { error: 'Failed to fetch admins' }
+        }
+
+        // 2. Filter out excluded user (e.g. the sender)
+        const targetUserIds = adminStaffs
+            .map(s => s.auth_user_id)
+            .filter(uid => uid && uid !== excludeUserId)
+
+        if (targetUserIds.length === 0) return { success: true }
+
+        // 3. Insert notifications
+        const notifications = targetUserIds.map(uid => ({
+            title,
+            content,
+            type,
+            user_id: uid,
+            facility_id: null // Global notification for that user
+        }))
+
+        const { error: insertError } = await supabase
+            .from('notifications')
+            .insert(notifications)
+
+        if (insertError) {
+            console.error('Error sending admin notifications:', insertError)
+            return { error: insertError.message }
+        }
+
+        return { success: true }
+    } catch (e) {
+        console.error('notifyOrganizationAdmins error:', e)
+        return { error: 'Unexpected error' }
+    }
+}
