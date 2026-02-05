@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { protect } from '@/lib/auth-guard'
 import { logger } from '@/lib/logger'
 import { translateError } from '@/lib/error-translator'
+import { logOperation, TargetResource } from '@/lib/operation-logger'
 
 export async function getDailyShift(date: string, facilityIdArg?: string) {
     try {
@@ -134,6 +135,14 @@ export async function upsertDailyShift(date: string, payload: DayShiftSummary, f
 
         if (!facilityId) return { error: '施設情報がありません' }
 
+        // Fetch existing data for comparison
+        const { data: existing } = await supabase
+            .from('daily_shifts')
+            .select('day_staff_ids, night_staff_ids, night_shift_plus')
+            .eq('facility_id', facilityId)
+            .eq('date', date)
+            .maybeSingle()
+
         // Prepare bulk upsert payload
         const upsertData = {
             facility_id: facilityId!,
@@ -153,6 +162,39 @@ export async function upsertDailyShift(date: string, payload: DayShiftSummary, f
             return { error: `更新に失敗しました: ${translateError(error.message)}` }
         }
 
+        // Log changes if there are any differences
+        const beforeDayIds = existing?.day_staff_ids || []
+        const beforeNightIds = existing?.night_staff_ids || []
+        const beforeNightPlus = existing?.night_shift_plus ?? false
+
+        const dayStaffChanged = JSON.stringify(beforeDayIds) !== JSON.stringify(payload.day_staff_ids)
+        const nightStaffChanged = JSON.stringify(beforeNightIds) !== JSON.stringify(payload.night_staff_ids)
+        const nightPlusChanged = beforeNightPlus !== payload.night_shift_plus
+
+        if (dayStaffChanged || nightStaffChanged || nightPlusChanged) {
+            logOperation({
+                organizationId: staff.organization_id,
+                actorId: staff.id,
+                targetResource: 'daily_record' as TargetResource,
+                actionType: 'UPDATE',
+                details: {
+                    date,
+                    facilityId,
+                    type: 'shift_update'
+                },
+                before: {
+                    ...(dayStaffChanged && { day_staff_ids: beforeDayIds }),
+                    ...(nightStaffChanged && { night_staff_ids: beforeNightIds }),
+                    ...(nightPlusChanged && { night_shift_plus: beforeNightPlus })
+                },
+                after: {
+                    ...(dayStaffChanged && { day_staff_ids: payload.day_staff_ids }),
+                    ...(nightStaffChanged && { night_staff_ids: payload.night_staff_ids }),
+                    ...(nightPlusChanged && { night_shift_plus: payload.night_shift_plus })
+                }
+            })
+        }
+
         revalidatePath('/daily-reports')
         return { success: true }
     } catch (e) {
@@ -160,3 +202,4 @@ export async function upsertDailyShift(date: string, payload: DayShiftSummary, f
         return { error: '予期せぬエラーが発生しました' }
     }
 }
+

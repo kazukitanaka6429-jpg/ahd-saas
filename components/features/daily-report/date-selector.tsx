@@ -56,8 +56,8 @@ export function DateSelector({ date }: { date: string }) {
 
     return (
         <div className="flex items-center space-x-2">
-            <Button variant="outline" size="icon" onClick={handlePrevDay}>
-                <ChevronLeft className="h-4 w-4" />
+            <Button variant="outline" size="icon" className="h-12 w-12" onClick={handlePrevDay}>
+                <ChevronLeft className="h-6 w-6" />
             </Button>
 
             <Popover open={open} onOpenChange={setOpen}>
@@ -66,12 +66,12 @@ export function DateSelector({ date }: { date: string }) {
                         variant={"outline"}
                         suppressHydrationWarning
                         className={cn(
-                            "w-[240px] justify-start text-left font-normal",
+                            "w-[280px] h-12 justify-start text-left text-lg font-bold",
                             !date && "text-muted-foreground"
                         )}
                     >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {date ? format(currentDate, "PPP", { locale: ja }) : <span>日付を選択</span>}
+                        <CalendarIcon className="mr-3 h-5 w-5" />
+                        {date ? format(currentDate, "yyyy年M月d日(EEE)", { locale: ja }) : <span>日付を選択</span>}
                     </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -85,15 +85,15 @@ export function DateSelector({ date }: { date: string }) {
                 </PopoverContent>
             </Popover>
 
-            <Button variant="outline" size="icon" onClick={handleNextDay}>
-                <ChevronRight className="h-4 w-4" />
+            <Button variant="outline" size="icon" className="h-12 w-12" onClick={handleNextDay}>
+                <ChevronRight className="h-6 w-6" />
             </Button>
 
             <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => handleDateSelect(new Date())}
-                className="text-xs text-muted-foreground"
+                className="text-sm text-muted-foreground ml-2"
             >
                 今日へ戻る
             </Button>

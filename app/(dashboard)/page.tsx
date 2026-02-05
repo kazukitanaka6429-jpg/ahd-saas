@@ -29,7 +29,7 @@ export default async function Home() {
     <div className="p-8 space-y-8">
       <div>
         <h1 className="text-3xl font-bold mb-2">ダッシュボード</h1>
-        <p className="text-gray-500">ようこそ、{user?.email}さん</p>
+        <p className="text-gray-500">ようこそ、{staff?.name || user?.email}さん</p>
       </div>
 
       <DashboardWidgetsWrapper isHQ={isHQ} documentAlerts={documentAlerts} />

@@ -7,6 +7,7 @@ import { Resident } from '@/types'
 import { protect } from '@/lib/auth-guard'
 import { logger } from '@/lib/logger'
 import { translateError } from '@/lib/error-translator'
+import { logOperation } from '@/lib/operation-logger'
 
 // Helper: Recalculate Medical V units for the entire current month
 // Called when sputum_suction flag changes for any resident
@@ -179,6 +180,15 @@ export async function createResident(data: ResidentInput) {
         // Recalculate Medical V units for current month when resident is created
         await recalculateMedicalVUnits(facilityId, supabase)
 
+        // Audit Log
+        logOperation({
+            organizationId: staff.organization_id,
+            actorId: staff.id,
+            targetResource: 'resident',
+            actionType: 'CREATE',
+            details: { name: data.name, facilityId }
+        })
+
         revalidatePath('/residents')
         revalidatePath('/medical-v')
         return { success: true }
@@ -235,6 +245,16 @@ export async function updateResident(id: string, data: Partial<ResidentInput>) {
             await recalculateMedicalVUnits(resident.facility_id, supabase)
         }
 
+        // Audit Log
+        logOperation({
+            organizationId: staff.organization_id,
+            actorId: staff.id,
+            targetResource: 'resident',
+            actionType: 'UPDATE',
+            targetId: id,
+            details: { name: data.name }
+        })
+
         revalidatePath('/residents')
         revalidatePath('/medical-v')
         return { success: true }
@@ -269,6 +289,15 @@ export async function deleteResident(id: string) {
             logger.error('deleteResident failed', error)
             return { error: translateError(error.message) }
         }
+
+        // Audit Log
+        logOperation({
+            organizationId: staff.organization_id,
+            actorId: staff.id,
+            targetResource: 'resident',
+            actionType: 'DELETE',
+            targetId: id
+        })
 
         revalidatePath('/residents')
         return { success: true }

@@ -3,10 +3,14 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '5mb',
+    },
+  },
 };
 
-// Sentry configuration options
-const sentryWebpackPluginOptions = {
+export default withSentryConfig(nextConfig, {
   // For all available options, see:
   // https://github.com/getsentry/sentry-webpack-plugin#options
 
@@ -39,6 +43,4 @@ const sentryWebpackPluginOptions = {
   // https://docs.sentry.io/product/crons/
   // https://vercel.com/docs/cron-jobs
   automaticVercelMonitors: true,
-};
-
-export default withSentryConfig(nextConfig, sentryWebpackPluginOptions);
+});

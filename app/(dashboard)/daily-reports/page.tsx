@@ -83,11 +83,7 @@ export default async function DailyReportsPage({
                         <FacilitySwitcher variant="header" />
                     </div>
                     <div className="flex flex-col items-end gap-2">
-                        <span className="text-2xl font-bold text-gray-800">
-                            {format(new Date(today), 'yyyy年 M月', { locale: ja })}
-                        </span>
                         <DateSelector date={today} />
-                        <div className="text-sm text-gray-500 font-bold">{displayDate}</div>
                         <ResetDailyReportButton date={today} facilityId={facilityId} />
                     </div>
                 </div>

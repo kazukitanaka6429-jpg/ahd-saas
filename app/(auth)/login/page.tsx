@@ -55,12 +55,19 @@ export default function LoginPage() {
             <Card className="w-full max-w-md">
                 <CardHeader className="space-y-1">
                     <CardTitle className="flex justify-center py-4">
-                        <div className="relative h-12 w-full max-w-[200px]">
+                        <div className="relative w-full max-w-[280px] p-4">
                             <Image
-                                src="/logo_final.png"
+                                src="/logo.png"
                                 alt="Yorisol"
-                                fill
-                                className="object-contain"
+                                width={0}
+                                height={0}
+                                sizes="100vw"
+                                style={{
+                                    width: '100%',
+                                    height: 'auto',
+                                    mixBlendMode: 'multiply',
+                                    transform: 'scale(1.1)'
+                                }}
                                 priority
                             />
                         </div>

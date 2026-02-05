@@ -1,49 +1,44 @@
-# 施設間連絡機能 (Facility Notifications) 実装計画
+# Facility to HQ Notifications Implementation Plan
 
-## 目標
-施設（現場）から本社への連絡スムーズに行い、本社側で施設ごとに整理して確認できる機能を実装する。
+## Goal Description
+Implement automatic notifications when Facility Staff replies to or resolves a Finding. This ensures HQ is aware of feedback and resolutions.
 
-## ユーザーレビューが必要な事項
-- 特になし
+## User Definition
+"2. 施設側からの回答時" involves:
+1.  **Commenting**: Non-admin staff adds a comment to a finding.
+2.  **Resolving**: Non-admin staff toggles a finding to "Resolved".
 
-## 変更内容
+## Proposed Changes
 
-### Database (Supabase)
-`facility_notifications` テーブルを作成する。
-- `facility_id` (FK), `created_by` (FK)
-- `content`, `priority` (high/normal/low), `status` (open/resolved)
-- `created_at`, `resolved_at`, `resolved_by` (FK)
+### Backend (`app/actions/system-notifications.ts`)
+#### [NEW] `notifyOrganizationAdmins`
+- Input: `organizationId`, `title`, `content`
+- Logic:
+    1.  Select all `staffs` where `organization_id = organizationId` AND `role = 'admin'`.
+    2.  Extract `auth_user_id`s.
+    3.  Insert into `notifications` table for each `user_id`:
+        -   `facility_id`: NULL (so it doesn't associate with a specific facility view, but specific user target overrides RLS)
+        -   `user_id`: Target Admin's ID
+        -   `type`: 'info'
 
-### Backend (Server Actions)
-#### [NEW] [notifications.ts](file:///c%3A/Users/ktana/.gemini/antigravity/playground/infrared-rocket/app/actions/notifications.ts)
-- `createNotification`: Server Action。フォームデータを受け取り、DBに保存。
-- `getUnresolvedNotifications`: 未解決の通知を取得。`facilities` を JOIN して施設名を含める。
-- `resolveNotification`: ステータスを `resolved` に更新。
+### Backend (`app/actions/findings.ts`)
+#### [MODIFY] `addFindingComment`
+- Logic Change:
+    - If `staff.role !== 'admin'`:
+        - Call `notifyOrganizationAdmins`.
+        - Title: "施設から回答がありました"
+        - Content: "[Facility Name] [Staff Name]: [Comment Truncated]"
 
-### Frontend
-#### [NEW] [CreateNotificationModal.tsx](file:///c%3A/Users/ktana/.gemini/antigravity/playground/infrared-rocket/components/common/CreateNotificationModal.tsx)
-- 送信フォーム（内容、重要度）。
-- Server Action を呼び出す。
+#### [MODIFY] `toggleFindingResolved`
+- Logic Change:
+    - If `staff.role !== 'admin'` AND `newStatus === true` (Resolved):
+        - Call `notifyOrganizationAdmins`.
+        - Title: "指摘が解決済みになりました"
+        - Content: "[Facility Name] [Staff Name]が指摘を解決済みにしました。"
 
-#### [NEW] [NotificationWidget.tsx](file:///c%3A/Users/ktana/.gemini/antigravity/playground/infrared-rocket/components/dashboard/NotificationWidget.tsx)
-- 通知データを取得し、施設ごとにグルーピングして表示。
-- 重要度 'high' がある場合はヘッダーを強調。
-- 解決ボタンで `resolveNotification` を呼び出す。
-
-#### [MODIFY] [Header.tsx](file:///c%3A/Users/ktana/.gemini/antigravity/playground/infrared-rocket/components/layout/Header.tsx) (仮定)
-- 「本社へ連絡」ボタンを追加し、モーダルを開く。
-
-#### [MODIFY] [DashboardPage](file:///c%3A/Users/ktana/.gemini/antigravity/playground/infrared-rocket/app/(dashboard)/page.tsx) (仮定)
-- `NotificationWidget` を配置。
-
-## 検証計画
-### 自動テスト
-- なし
-
-### 手動検証
-1. 施設アカウントでログイン（または施設を選択）。
-2. ヘッダーの「本社へ連絡」から通知（Normal, High）を送信。
-3. DBにレコードが作成されたか確認。
-4. 本社ダッシュボードで、施設ごとに通知が表示されるか確認。
-5. Highの通知がある施設が強調されているか確認。
-6. 「確認ボタン」で完了済みになり、リストから消えるか確認。
+## Verification Plan
+1.  **Setup**: Staff user (Facility A) and Admin user (HQ).
+2.  **Action 1**: Staff replies to a finding.
+    - Check: Admin receives "施設から回答がありました".
+3.  **Action 2**: Staff marks finding as resolved.
+    - Check: Admin receives "指摘が解決済みになりました".

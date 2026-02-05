@@ -4,6 +4,9 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { StaffWithFacility } from '@/types'
+import { AutoLogoutProvider } from '@/components/providers/auto-logout-provider'
+
+import { Header } from '@/components/layout/header'
 
 export default async function DashboardLayout({
     children,
@@ -67,17 +70,25 @@ export default async function DashboardLayout({
 
     return (
         <FacilityProvider initialStaff={initialStaff as StaffWithFacility} initialFacilityId={selectedFacilityId}>
-            <div className="flex h-screen overflow-hidden flex-row">
-                <Sidebar
-                    role={initialStaff?.role}
-                    // Facility Name handling is now dynamic within Sidebar via Switcher, but passing initial prop as fallback
-                    facilityName={(initialStaff as StaffWithFacility)?.facilities?.name}
-                    hasMultipleAccounts={false} // Deprecated/Handled by Switcher now
-                />
-                <main className="flex-1 overflow-y-auto bg-background p-8">
-                    {children}
-                </main>
-            </div>
+            <AutoLogoutProvider>
+                <div className="flex h-screen w-full flex-col overflow-hidden bg-background print:h-auto print:overflow-visible">
+                    <div className="print:hidden">
+                        <Header />
+                    </div>
+                    <div className="flex flex-1 overflow-hidden flex-row print:flex-col print:overflow-visible print:h-auto">
+                        <div className="print:hidden h-full">
+                            <Sidebar
+                                role={initialStaff?.role}
+                                facilityName={(initialStaff as StaffWithFacility)?.facilities?.name}
+                                hasMultipleAccounts={false}
+                            />
+                        </div>
+                        <main className="flex-1 overflow-y-auto p-8 print:overflow-visible print:h-auto print:p-0">
+                            {children}
+                        </main>
+                    </div>
+                </div>
+            </AutoLogoutProvider>
         </FacilityProvider>
     )
 }

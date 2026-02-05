@@ -71,9 +71,15 @@ const sidebarItems: SidebarItem[] = [
         icon: ClipboardCheck,
     },
     {
-        title: '分析',
+        title: '人員配置チェック',
+        href: '/audit/personnel',
+        icon: Users, // Using Users for now or add new icon
+    },
+    {
+        title: 'ログ分析',
         href: '/analysis',
         icon: BarChart3,
+        adminOnly: true,
     },
     // マスタ管理グループ
     {
@@ -175,45 +181,34 @@ export function Sidebar({ role, facilityName, hasMultipleAccounts }: { role?: st
                 isCollapsed ? "w-20 px-2" : "w-64 px-4"
             )}
         >
-            <div className={cn("mb-6 flex flex-col gap-2 transition-all duration-300", isCollapsed ? "items-center px-0" : "px-2")}>
-                <div className="flex items-center justify-between w-full mb-2">
-                    {/* Toggle Button - Now static position */}
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-foreground"
-                        onClick={toggleSidebar}
-                    >
-                        <Menu className="h-5 w-5" />
-                    </Button>
-                </div>
-
-                <div className="flex items-center px-2">
-                    <div className={cn("transition-all duration-300", isCollapsed ? "hidden" : "block")}>
-                        <Image
-                            src="/logo_final.png"
-                            alt="ヨリソル"
-                            width={0}
-                            height={0}
-                            sizes="100vw"
-                            style={{ width: 'auto', height: '40px' }}
-                            priority
-                        />
-                    </div>
-                    {!isCollapsed && (
-                        <div className="ml-2 text-xs text-sidebar-foreground/60 border border-sidebar-border rounded px-1 whitespace-nowrap">
-                            {role === 'admin' ? '本社' : role === 'manager' ? '管理者' : '一般'}
-                        </div>
-                    )}
-                </div>
-                {!isCollapsed && (
-                    <div className="flex items-center justify-between text-sm text-gray-600 bg-white/50 p-2 rounded-md border border-dashed">
-                        <div className="w-full">
-                            <FacilitySwitcher />
-                        </div>
-                    </div>
-                )}
+            <div className="flex items-center justify-between w-full mb-2 px-2">
+                {/* Toggle Button - Now static position */}
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-foreground ml-auto"
+                    onClick={toggleSidebar}
+                >
+                    <Menu className="h-5 w-5" />
+                </Button>
             </div>
+
+            {!isCollapsed && (
+                /* Role Badge */
+                <div className="flex justify-center mb-4">
+                    <div className="text-xs text-sidebar-foreground/60 border border-sidebar-border rounded px-2 py-0.5 whitespace-nowrap bg-sidebar/50">
+                        {role === 'admin' ? '本社' : role === 'manager' ? '管理者' : '一般'}
+                    </div>
+                </div>
+            )}
+
+            {!isCollapsed && (
+                <div className="flex items-center justify-between text-sm text-gray-600 p-2 rounded-md">
+                    <div className="w-full">
+                        <FacilitySwitcher />
+                    </div>
+                </div>
+            )}
 
             <div className="flex flex-1 flex-col gap-2 overflow-hidden overflow-y-auto">
                 {sidebarItems.map((item, index) => {
@@ -334,6 +329,6 @@ export function Sidebar({ role, facilityName, hasMultipleAccounts }: { role?: st
                     {!isCollapsed && <span>ログアウト</span>}
                 </Button>
             </div>
-        </div>
+        </div >
     )
 }

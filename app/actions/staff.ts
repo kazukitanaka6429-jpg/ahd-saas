@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache'
 import { protect } from '@/lib/auth-guard'
 import { logger } from '@/lib/logger'
 import { translateError } from '@/lib/error-translator'
+import { logOperation } from '@/lib/operation-logger'
 
 // Get All Staffs for current context
 export async function getStaffs() {
@@ -88,6 +89,16 @@ export async function createStaff(data: {
             return { error: translateError(error.message) }
         }
 
+        // Audit Log
+        logOperation({
+            organizationId: currentStaff.organization_id,
+            actorId: currentStaff.id,
+            targetResource: 'staff',
+            actionType: 'CREATE',
+            targetId: newStaff?.id,
+            details: { name: data.name, role: data.role }
+        })
+
         revalidatePath('/staffs')
         return { success: true, staff: newStaff }
     } catch (e) {
@@ -123,6 +134,16 @@ export async function updateStaff(staffId: string, data: {
             logger.error('Error updating staff:', error)
             return { error: translateError(error.message) }
         }
+
+        // Audit Log
+        logOperation({
+            organizationId: currentStaff.organization_id,
+            actorId: currentStaff.id,
+            targetResource: 'staff',
+            actionType: 'UPDATE',
+            targetId: staffId,
+            details: { name: data.name, role: data.role }
+        })
 
         revalidatePath('/staffs')
         return { success: true }
@@ -220,6 +241,15 @@ export async function deleteStaff(staffId: string) {
                 // Continue as DB record is deleted
             }
         }
+
+        // Audit Log
+        logOperation({
+            organizationId: currentStaff.organization_id,
+            actorId: currentStaff.id,
+            targetResource: 'staff',
+            actionType: 'DELETE',
+            targetId: staffId
+        })
 
         revalidatePath('/staffs')
         return { success: true }

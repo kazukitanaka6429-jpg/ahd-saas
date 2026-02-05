@@ -1,16 +1,12 @@
-# 施設間連絡機能 (Facility Notifications) 実装タスク
+# Facility to HQ Notifications Task List
 
-- [ ] データベース構築
-    - [ ] `facility_notifications` テーブル作成SQLの作成と実行
-- [ ] バックエンド実装 (Server Actions)
-    - [ ] `actions/notifications.ts` 作成
-        - [ ] `createNotification` 実装
-        - [ ] `getUnresolvedNotifications` 実装
-        - [ ] `resolveNotification` 実装
-- [ ] フロントエンド実装 (components)
-    - [ ] `components/common/CreateNotificationModal.tsx` 作成 (送信モーダル)
-    - [ ] `components/dashboard/NotificationWidget.tsx` 作成 (本社用ダッシュボード表示)
-- [ ] 統合と確認
-    - [ ] ヘッダー等への送信ボタン配置
-    - [ ] ダッシュボードへのウィジェット配置
-    - [ ] 動作確認 (送信 -> 表示 -> 完了)
+- [x] Create implementation plan <!-- id: 0 -->
+- [x] Implement `notifyOrganizationAdmins` in `app/actions/system-notifications.ts` <!-- id: 1 -->
+    - [x] Fetch all staff with `role = 'admin'` in the same organization
+    - [x] Create individual notifications for each admin user
+- [x] Implement notification logic in `app/actions/findings.ts` <!-- id: 2 -->
+    - [x] `addFindingComment`: If user is NOT admin, notify admins ("Answer from [Facility]")
+    - [x] `toggleFindingResolved`: If user is NOT admin and finding is resolved, notify admins ("Resolved by [Facility]")
+- [x] Verify implementation <!-- id: 3 -->
+    - [x] Reply as Staff -> Admin receives notification
+    - [x] Resolve as Staff -> Admin receives notification

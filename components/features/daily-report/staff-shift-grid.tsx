@@ -114,8 +114,8 @@ export function StaffShiftGrid({ staffs, initialData, date, facilityId }: StaffS
                         <div className="bg-green-100 flex items-center justify-center font-bold border-r border-black p-2 text-sm">
                             日勤
                         </div>
-                        <div className="grid grid-cols-4 divide-x divide-black w-[400px]">
-                            {[0, 1, 2, 3].map(i => (
+                        <div className="grid grid-cols-8 divide-x divide-black w-[800px]">
+                            {[0, 1, 2, 3, 4, 5, 6, 7].map(i => (
                                 <div key={i} className="p-1">
                                     <StaffSelect
                                         staffs={staffs}
@@ -132,8 +132,8 @@ export function StaffShiftGrid({ staffs, initialData, date, facilityId }: StaffS
                         <div className="bg-green-100 flex items-center justify-center font-bold border-r border-black p-2 text-sm">
                             夜勤
                         </div>
-                        <div className="grid grid-cols-4 divide-x divide-black w-[400px]">
-                            {[0, 1, 2, 3].map(i => (
+                        <div className="grid grid-cols-8 divide-x divide-black w-[800px]">
+                            {[0, 1, 2, 3, 4, 5, 6, 7].map(i => (
                                 <div key={i} className="p-1">
                                     <StaffSelect
                                         staffs={staffs}

@@ -64,6 +64,32 @@ export async function addFindingComment(
 
         const supabase = await createClient()
 
+        // 1. Resolve Facility ID (Needed for Notification and fallback for Medical V)
+        let facilityId: string | null = null
+
+        if (recordType === 'daily') {
+            const { data } = await supabase.from('daily_records').select('facility_id').eq('id', recordId).single()
+            facilityId = data?.facility_id || null
+        } else if (recordType === 'medical') {
+            const { data } = await supabase.from('medical_cooperation_records').select('resident_id').eq('id', recordId).single()
+            if (data?.resident_id) {
+                const { data: res } = await supabase.from('residents').select('facility_id').eq('id', data.resident_id).single()
+                facilityId = res?.facility_id || null
+            }
+        } else if (recordType === 'short_stay') {
+            const { data } = await supabase.from('short_stay_records').select('facility_id').eq('id', recordId).single()
+            facilityId = data?.facility_id || null
+        } else if (recordType === 'medical_v_daily') {
+            const { data } = await supabase.from('medical_coord_v_daily').select('facility_id').eq('id', recordId).single()
+            facilityId = data?.facility_id || null
+        } else if (recordType === 'medical_v_record') {
+            const { data } = await supabase.from('medical_coord_v_records').select('facility_id').eq('id', recordId).single()
+            facilityId = data?.facility_id || null
+        } else if (recordType === 'resident') {
+            const { data } = await supabase.from('residents').select('facility_id').eq('id', recordId).single()
+            facilityId = data?.facility_id || null
+        }
+
         const payload: {
             json_path: string
             comment: string
@@ -75,11 +101,15 @@ export async function addFindingComment(
             medical_v_daily_id?: string
             medical_v_record_id?: string
             resident_id?: string
+            facility_id?: string
+            author_id: string
         } = {
             json_path: jsonPath,
             comment: content,
             author_name: staff.name,
-            is_resolved: false
+            is_resolved: false,
+            facility_id: facilityId || undefined,
+            author_id: staff.id
         }
 
         if (recordType === 'daily') {
@@ -104,6 +134,49 @@ export async function addFindingComment(
             logger.error('Error adding finding:', error)
             return { error: translateError(error.message) }
         }
+
+        // 2. Send Notification if Admin
+        if (staff.role === 'admin' && facilityId) {
+            // Import dynamically or at top? Using dependency injection pattern is hard here.
+            // We'll use the imported function.
+            // But we need to import it at top of file.
+            // For now, let's assume I will add the import in a separate tool call or use multi-replace to add import too.
+            // Wait, replace_file_content replaces a block. I need to replace the whole function AND add import?
+            // "Use this tool ONLY when you are making a SINGLE CONTIGUOUS block of edits".
+            // Adding import at top and modifying function at bottom is NON-contiguous.
+            // So I should have used multi_replace_file_content.
+            // I will use multi_replace_file_content in the next step to fix the missing import.
+
+            // For now, keep the logic here.
+            const { createSystemNotification } = await import('@/app/actions/system-notifications')
+
+            const truncatedContent = content.length > 50 ? content.substring(0, 50) + '...' : content
+            await createSystemNotification(
+                '本部から指摘がありました',
+                truncatedContent,
+                'warning',
+                facilityId
+            )
+        } else if (staff.role !== 'admin') {
+            // 3. Notify Admin if Staff
+            const { notifyOrganizationAdmins } = await import('@/app/actions/system-notifications')
+
+            let facilityName = '不明な施設'
+            if (staff.facility_id) {
+                const { data: facil } = await supabase.from('facilities').select('name').eq('id', staff.facility_id).single()
+                if (facil) facilityName = facil.name
+            }
+
+            const truncatedContent = content.length > 30 ? content.substring(0, 30) + '...' : content
+            await notifyOrganizationAdmins(
+                staff.organization_id,
+                '施設から回答がありました',
+                `[${facilityName}] ${staff.name}: ${truncatedContent}`,
+                'info',
+                staff.auth_user_id
+            )
+        }
+
         revalidatePath('/daily-reports')
         revalidatePath('/medical-cooperation')
         revalidatePath('/medical-v')
@@ -127,11 +200,36 @@ export async function toggleFindingResolved(commentId: string, currentStatus: bo
             .from('finding_comments')
             .update({ is_resolved: !currentStatus })
             .eq('id', commentId)
+            // Select back to get info for notification
+            .select('*, author:staffs(organization_id, facility_id, name)')
+            .single()
 
         if (error) {
             logger.error('Error toggling finding:', error)
             return { error: translateError(error.message) }
         }
+
+        // Notify Admin if resolved by non-admin
+        // New status is valid because we flipped it. !currentStatus is the new status.
+        const newStatus = !currentStatus
+        if (newStatus === true && staff.role !== 'admin') {
+            const { notifyOrganizationAdmins } = await import('@/app/actions/system-notifications')
+
+            let facilityName = '不明な施設'
+            if (staff.facility_id) {
+                const { data: facil } = await supabase.from('facilities').select('name').eq('id', staff.facility_id).single()
+                if (facil) facilityName = facil.name
+            }
+
+            await notifyOrganizationAdmins(
+                staff.organization_id,
+                '指摘が解決済みになりました',
+                `[${facilityName}] ${staff.name}が指摘を解決済みにしました。`,
+                'info',
+                staff.auth_user_id
+            )
+        }
+
         revalidatePath('/daily-reports')
         return { success: true }
     } catch (e) {
