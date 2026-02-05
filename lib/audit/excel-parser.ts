@@ -88,8 +88,8 @@ export function parseNursingExcel(buffer: ArrayBuffer, facilityId: string): Omit
             dateStr = String(dateStr).replace(/\//g, '-')
         }
 
-        const startTime = String(row[keyStart] || "00:00")
-        const endTime = String(row[keyEnd] || "00:00")
+        const startTime = keyStart ? String(row[keyStart] || "00:00") : "00:00"
+        const endTime = keyEnd ? String(row[keyEnd] || "00:00") : "00:00"
 
         // Formatting Time? If number (0.5 = 12:00), convert.
         const formatExcelTime = (val: any) => {
