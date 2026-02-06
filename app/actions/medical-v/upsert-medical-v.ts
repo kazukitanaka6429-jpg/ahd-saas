@@ -273,16 +273,13 @@ export async function saveMedicalVDataBulk(
                     calculated_units: calculatedUnits,
                     updated_at: new Date().toISOString()
                 }
-                console.log('[MedicalV Save] Upserting daily:', dailyPayload)
+
                 const { error: dailyError } = await supabase
                     .from('medical_coord_v_daily')
                     .upsert(dailyPayload, { onConflict: 'facility_id, date' })
 
                 if (dailyError) {
-                    console.error('[MedicalV Save] Daily UPSERT FAILED:', dailyError)
                     logger.error('Medical V daily upsert failed', dailyError)
-                } else {
-                    console.log('[MedicalV Save] Daily upsert SUCCESS')
                 }
             }
         }
@@ -299,8 +296,6 @@ export async function saveMedicalVDataBulk(
                 .limit(1) // Just take one if multiple
                 .maybeSingle()
 
-            console.log('[MedicalV Save] Processing:', { date: r.date, resident_id: r.resident_id, is_executed: r.is_executed, existing: !!existing })
-
             if (r.is_executed) {
                 if (!existing) {
                     const insertPayload = {
@@ -311,13 +306,10 @@ export async function saveMedicalVDataBulk(
                         date: r.date,
                         updated_at: new Date().toISOString()
                     }
-                    console.log('[MedicalV Save] Inserting:', insertPayload)
+
                     const { error: insertError } = await supabase.from('medical_coord_v_records').insert(insertPayload)
                     if (insertError) {
-                        console.error('[MedicalV Save] INSERT FAILED:', insertError)
                         logger.error('Medical V insert failed', insertError)
-                    } else {
-                        console.log('[MedicalV Save] Insert SUCCESS')
                     }
                 }
             } else {
@@ -330,10 +322,7 @@ export async function saveMedicalVDataBulk(
                         .eq('date', r.date)
                         .eq('resident_id', r.resident_id)
                     if (deleteError) {
-                        console.error('[MedicalV Save] DELETE FAILED:', deleteError)
                         logger.error('Medical V delete failed', deleteError)
-                    } else {
-                        console.log('[MedicalV Save] Delete SUCCESS')
                     }
                 }
             }

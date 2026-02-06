@@ -97,9 +97,7 @@ export default async function MedicalCooperationPage({
         .eq('facility_id', facilityId)
         .eq('status', 'active')
 
-    console.log('[MedicalIV] FacilityID:', facilityId)
-    console.log('[MedicalIV] Filtered Nurses:', nurses?.length)
-    console.log('[MedicalIV] All Active Staff:', JSON.stringify(allStaff, null, 2))
+
 
     // Fetch Indicators for the whole month
     const { getFindingsCountByRange } = await import('@/app/actions/findings')
