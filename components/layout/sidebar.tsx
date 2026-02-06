@@ -181,12 +181,15 @@ export function Sidebar({ role, facilityName, hasMultipleAccounts }: { role?: st
                 isCollapsed ? "w-20 px-2" : "w-64 px-4"
             )}
         >
-            <div className="flex items-center justify-between w-full mb-2 px-2">
-                {/* Toggle Button - Now static position */}
+            <div className={cn("flex items-center w-full mb-2 px-2", isCollapsed ? "justify-center" : "justify-between")}>
+                {/* Toggle Button */}
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-foreground ml-auto"
+                    className={cn(
+                        "h-8 w-8 hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-foreground",
+                        isCollapsed ? "" : "ml-auto"
+                    )}
                     onClick={toggleSidebar}
                 >
                     <Menu className="h-5 w-5" />
