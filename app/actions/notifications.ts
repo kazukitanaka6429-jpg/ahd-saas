@@ -53,14 +53,10 @@ export async function createNotification(formData: FormData) {
         // Get current staff (considering multi-tenancy)
         const staff = await getCurrentStaff()
 
-        console.log('[Notification] Staff data:', {
-            staffId: staff?.id,
-            facilityId: staff?.facility_id,
-            role: staff?.role
-        })
+
 
         if (!staff || !staff.facility_id) {
-            console.error('[Notification] Staff or facility_id missing:', { staff })
+
             return { error: '施設情報が見つかりません' }
         }
 
@@ -78,23 +74,23 @@ export async function createNotification(formData: FormData) {
             priority,
             status: 'open'
         }
-        console.log('[Notification] Insert payload:', insertPayload)
+
 
         const { error } = await supabase
             .from('facility_notifications') // Correct table name
             .insert(insertPayload)
 
         if (error) {
-            console.error('[Notification] Insert failed:', error)
+
             logger.error('Error creating notification:', error)
             return { error: `通知の作成に失敗しました: ${translateError(error.message)}` }
         }
 
-        console.log('[Notification] Insert SUCCESS')
+
         revalidatePath('/')
         return { success: true }
     } catch (e) {
-        console.error('[Notification] Unexpected error:', e)
+
         logger.error('Unexpected error in createNotification', e)
         return { error: '予期せぬエラーが発生しました' }
     }

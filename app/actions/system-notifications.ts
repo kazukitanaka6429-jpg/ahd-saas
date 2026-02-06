@@ -147,7 +147,7 @@ export async function createSystemNotification(
             })
 
         if (error) {
-            console.error('Create Notification Error:', error)
+            logger.error('Create Notification Error:', error)
             return { error: error.message }
         }
 
@@ -177,7 +177,7 @@ export async function notifyOrganizationAdmins(
             .eq('role', 'admin')
 
         if (staffError || !adminStaffs) {
-            console.error('Error fetching admin staffs:', staffError)
+            logger.error('Error fetching admin staffs:', staffError)
             return { error: 'Failed to fetch admins' }
         }
 
@@ -202,13 +202,13 @@ export async function notifyOrganizationAdmins(
             .insert(notifications)
 
         if (insertError) {
-            console.error('Error sending admin notifications:', insertError)
+            logger.error('Error sending admin notifications:', insertError)
             return { error: insertError.message }
         }
 
         return { success: true }
     } catch (e) {
-        console.error('notifyOrganizationAdmins error:', e)
+        logger.error('notifyOrganizationAdmins error:', e)
         return { error: 'Unexpected error' }
     }
 }

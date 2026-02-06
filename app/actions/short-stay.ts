@@ -61,7 +61,7 @@ export async function saveShortStayRecord(data: Partial<ShortStayRecord>, facili
             updated_at: new Date().toISOString()
         }
 
-        console.log('[ShortStay Save] Upserting:', JSON.stringify(record, null, 2))
+
 
         const { data: savedRecord, error } = await supabase
             .from('short_stay_records')
@@ -70,12 +70,12 @@ export async function saveShortStayRecord(data: Partial<ShortStayRecord>, facili
             .single()
 
         if (error) {
-            console.error('[ShortStay Save] FAILED:', error)
+
             logger.error('Error saving short stay record:', error)
             return errorResponse(translateError(error.message))
         }
 
-        console.log('[ShortStay Save] SUCCESS:', savedRecord?.id)
+
 
         revalidatePath('/daily-reports')
         return successResponse(savedRecord as ShortStayRecord)
