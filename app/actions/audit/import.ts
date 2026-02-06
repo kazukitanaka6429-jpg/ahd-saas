@@ -8,27 +8,7 @@ import { parseAttendanceCsv, parseSpotJobCsv, parseNursingCsv } from '@/lib/audi
 import { parseNursingExcel } from '@/lib/audit/excel-parser'
 import { revalidatePath } from 'next/cache'
 
-import iconv from 'iconv-lite'
-
-// Helper to handle encoding (Shift-JIS vs UTF-8)
-async function decodeCsvFile(file: File, expectedKeywords: string[]): Promise<string> {
-    const buffer = Buffer.from(await file.arrayBuffer())
-
-    // 1. Try UTF-8 first (standard)
-    const utf8Content = iconv.decode(buffer, 'utf-8')
-    if (expectedKeywords.some(k => utf8Content.includes(k))) {
-        return utf8Content
-    }
-
-    // 2. Try Shift-JIS (Excel Japan default)
-    const sjisContent = iconv.decode(buffer, 'Shift_JIS')
-    if (expectedKeywords.some(k => sjisContent.includes(k))) {
-        return sjisContent
-    }
-
-    // 3. Fallback to UTF-8 if neither matches strongly, or maybe it was UTF-8 but keywords missing
-    return utf8Content
-}
+import { decodeCsvFile } from '@/lib/csv-utils'
 
 /**
  * Import Attendance CSV (Kintai)

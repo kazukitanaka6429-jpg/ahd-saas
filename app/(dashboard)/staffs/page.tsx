@@ -7,15 +7,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table'
-import { StaffFormDialog } from './staff-form-dialog'
-import { InviteDialog } from './invite-dialog'
-import { InviteLinkButton } from './invite-link-button'
-import { StaffActions } from './staff-actions'
-import { Badge } from '@/components/ui/badge'
-import { CheckCircle } from 'lucide-react'
-import { getCurrentStaff } from '@/app/actions/auth'
-import { redirect } from 'next/navigation'
-import { StaffWithRelations } from '@/types'
+import { StaffImportDialog } from './staff-import-dialog'
 
 export default async function StaffsPage() {
     const staff = await getCurrentStaff()
@@ -88,6 +80,12 @@ export default async function StaffsPage() {
                     </p>
                 </div>
                 <div className="flex gap-2">
+                    {/* Only Admin allows import presumably, or managers? User said Staff Master is for Admin usually. 
+                        Let's allow it for whoever sees this page, but action checks permissions. 
+                        Actually only Admin should see Import maybe? 
+                        The import action checks for 'admin'. So let's hide button if not admin.
+                    */}
+                    {isHQ && <StaffImportDialog />}
                     <InviteDialog />
                     <StaffFormDialog currentStaff={staff} />
                 </div>
