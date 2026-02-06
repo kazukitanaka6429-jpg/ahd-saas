@@ -73,17 +73,20 @@ export default async function DashboardLayout({
             <AutoLogoutProvider>
                 <div className="flex h-screen w-full flex-col overflow-hidden bg-background print:h-auto print:overflow-visible">
                     <div className="print:hidden">
-                        <Header />
+                        <Header
+                            role={initialStaff?.role}
+                            facilityName={(initialStaff as StaffWithFacility)?.facilities?.name}
+                        />
                     </div>
                     <div className="flex flex-1 overflow-hidden flex-row print:flex-col print:overflow-visible print:h-auto">
-                        <div className="print:hidden h-full">
+                        <div className="hidden md:block h-full print:hidden">
                             <Sidebar
                                 role={initialStaff?.role}
                                 facilityName={(initialStaff as StaffWithFacility)?.facilities?.name}
                                 hasMultipleAccounts={false}
                             />
                         </div>
-                        <main className="flex-1 overflow-y-auto p-8 print:overflow-visible print:h-auto print:p-0">
+                        <main className="flex-1 overflow-y-auto p-4 md:p-8 print:overflow-visible print:h-auto print:p-0">
                             {children}
                         </main>
                     </div>
