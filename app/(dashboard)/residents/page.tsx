@@ -6,19 +6,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table'
-import { ResidentFormDialog } from './resident-form-dialog'
-import { ResidentActions } from './resident-actions'
-import { Resident } from '@/types'
-import { Badge } from '@/components/ui/badge'
-import { getCurrentStaff } from '@/app/actions/auth'
-import { getResidents } from '@/app/actions/resident'
-import { getResidentAlertLevels } from '@/app/actions/resident-documents'
-import { redirect } from 'next/navigation'
-import { AlertTriangle, AlertCircle, Info } from 'lucide-react'
-
-import { ResidentFacilityFilter } from './resident-facility-filter'
-import { createClient } from '@/lib/supabase/server'
-import { AlertLevel } from '@/lib/document-types'
+import { ResidentImportDialog } from './resident-import-dialog'
 
 export default async function ResidentsPage({ searchParams }: { searchParams: Promise<{ facility_id?: string }> }) {
     const staff = await getCurrentStaff()
@@ -100,7 +88,11 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
                         <ResidentFacilityFilter facilities={facilities} />
                     )}
                     {(staff.role === 'admin' || staff.role === 'manager') && (
-                        <ResidentFormDialog currentStaff={staff} />
+                        <>
+                            {/* Import is Admin only generally, but let's allow Manager too if they have CSV */}
+                            <ResidentImportDialog />
+                            <ResidentFormDialog currentStaff={staff} />
+                        </>
                     )}
                 </div>
             </div>
