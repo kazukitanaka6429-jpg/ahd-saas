@@ -1,0 +1,82 @@
+erDiagram
+    organizations ||--o{ facilities : owns
+    organizations ||--o{ staffs : employs
+    organizations ||--o{ residents : manages
+
+    facilities ||--o{ residents : houses
+    facilities ||--o{ staffs : employs_at
+    facilities ||--o{ daily_records : contains
+    
+    staffs ||--o{ daily_records : writes
+    staffs ||--o{ medical_coord_iv_records : performs
+    staffs ||--o{ medical_coord_v_records : performs
+
+    residents ||--o{ daily_records : subject_of
+    residents ||--o{ resident_documents : has
+    residents ||--o{ medical_coord_iv_records : receives
+    residents ||--o{ medical_coord_v_records : receives
+
+    %% Detailed Schema (Key Tables)
+    
+    organizations {
+        uuid id PK
+        string name
+    }
+
+    facilities {
+        uuid id PK
+        uuid organization_id FK
+        string name
+        string provider_number
+    }
+
+    staffs {
+        uuid id PK
+        uuid organization_id FK
+        uuid facility_id FK
+        string name
+        string email
+        string role "admin|manager|staff"
+    }
+
+    residents {
+        uuid id PK
+        uuid organization_id FK
+        uuid facility_id FK
+        string name
+        string care_level
+        boolean is_short_stay
+        date start_date
+        date end_date
+    }
+
+    daily_records {
+        uuid id PK
+        uuid organization_id FK
+        uuid facility_id FK
+        uuid resident_id FK
+        uuid staff_id FK
+        date date
+        jsonb vitals
+        jsonb care_levels
+        string notes
+    }
+
+    medical_coord_iv_records {
+        uuid id PK
+        uuid facility_id FK
+        uuid staff_id FK
+        date date
+        string classification
+        int assigned_resident_count
+        string care_contents
+    }
+
+    medical_coord_v_records {
+        uuid id PK
+        uuid facility_id FK
+        uuid resident_id FK
+        uuid staff_id FK
+        date date
+        boolean is_executed
+    }
