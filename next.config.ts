@@ -3,6 +3,7 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  output: "standalone",
   experimental: {
     serverActions: {
       bodySizeLimit: '5mb',

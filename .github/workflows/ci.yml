@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    name: Unit & Security Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    # Build checks for type errors
+    - name: Type Check
+      run: npm run build
+      env:
+        # Skip lint/type check during build command if configured in next.config.js, 
+        # but we want to fail on errors here. 
+        # Actually standard 'next build' runs type check.
+        # We need mock env vars for build to pass if it imports them at top level
+        NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co"
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "dummy-key"
+        SUPABASE_SERVICE_ROLE_KEY: "dummy-service-key"
+
+    - name: Run Unit Tests
+      run: npm test
+
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps
+      
+    - name: Run Playwright tests
+      run: npx playwright test
+      env:
+        CI: true
+        # Production build is usually better for E2E but dev server is faster for quick check
+        # We configured webServer in playwright.config.ts
+        NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co"
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "dummy-key"
