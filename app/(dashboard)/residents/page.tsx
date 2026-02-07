@@ -20,6 +20,7 @@ import { AlertTriangle, AlertCircle, Info } from 'lucide-react'
 import { ResidentFacilityFilter } from './resident-facility-filter'
 import { createClient } from '@/lib/supabase/server'
 import { AlertLevel } from '@/lib/document-types'
+import { logOperation } from '@/lib/operation-logger'
 
 export default async function ResidentsPage({ searchParams }: { searchParams: Promise<{ facility_id?: string }> }) {
     const staff = await getCurrentStaff()
@@ -46,9 +47,24 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
     const error = residentsResult.error
     const alertLevels = alertsResult.data
 
+
     if (error) {
         return <div className="p-8 text-red-500">エラーが発生しました: {error}</div>
     }
+
+    // AUDIT LOG: READ ACCESS
+    // Fire-and-forget log. No await needed as logOperation handles it internally.
+    logOperation({
+        organizationId: staff.organization_id,
+        actorId: staff.id,
+        targetResource: 'resident',
+        actionType: 'READ',
+        details: {
+            count: residents?.length || 0,
+            facilityIdFilter: facilityIdOverride || 'all',
+            view: 'list'
+        }
+    })
 
     const getStatusLabel = (status: string) => {
         switch (status) {

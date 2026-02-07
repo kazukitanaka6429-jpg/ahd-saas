@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { headers } from 'next/headers'
 
-export type ActionType = 'CREATE' | 'UPDATE' | 'DELETE' | 'EXPORT' | 'LOGIN' | 'LOGOUT'
+export type ActionType = 'CREATE' | 'UPDATE' | 'DELETE' | 'EXPORT' | 'LOGIN' | 'LOGOUT' | 'READ'
 export type TargetResource =
     | 'daily_record'
     | 'medical_iv_record'
