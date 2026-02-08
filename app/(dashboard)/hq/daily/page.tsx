@@ -9,6 +9,68 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import type { ResidentMatrixData } from '@/types'
+
+// Helper: Extract counts from matrix data for reconciliation
+function extractYorisolData(matrixData: ResidentMatrixData[]) {
+    const mealData: {
+        residentId: string
+        residentName: string
+        breakfastCount: number
+        lunchCount: number
+        dinnerCount: number
+    }[] = []
+
+    const additionData: {
+        residentId: string
+        residentName: string
+        dayActivityCount: number
+        nightShiftCount: number
+        medicalIV1Count: number
+        medicalIV2Count: number
+        medicalIV3Count: number
+    }[] = []
+
+    for (const item of matrixData) {
+        const { resident, rows } = item
+
+        // Count true values in dailyValues array
+        const countTrues = (row: { key: string; dailyValues: boolean[] } | undefined) => {
+            if (!row) return 0
+            return row.dailyValues.filter(v => v === true).length
+        }
+
+        const breakfastRow = rows.find(r => r.key === 'meal_breakfast')
+        const lunchRow = rows.find(r => r.key === 'meal_lunch')
+        const dinnerRow = rows.find(r => r.key === 'meal_dinner')
+
+        mealData.push({
+            residentId: resident.id,
+            residentName: resident.name,
+            breakfastCount: countTrues(breakfastRow),
+            lunchCount: countTrues(lunchRow),
+            dinnerCount: countTrues(dinnerRow),
+        })
+
+        const dayActivityRow = rows.find(r => r.key === 'daytime_activity')
+        const nightShiftRow = rows.find(r => r.key === 'is_night_shift')
+        const iv1Row = rows.find(r => r.key === 'medical_iv_1')
+        const iv2Row = rows.find(r => r.key === 'medical_iv_2')
+        const iv3Row = rows.find(r => r.key === 'medical_iv_3')
+
+        additionData.push({
+            residentId: resident.id,
+            residentName: resident.name,
+            dayActivityCount: countTrues(dayActivityRow),
+            nightShiftCount: countTrues(nightShiftRow),
+            medicalIV1Count: countTrues(iv1Row),
+            medicalIV2Count: countTrues(iv2Row),
+            medicalIV3Count: countTrues(iv3Row),
+        })
+    }
+
+    return { mealData, additionData }
+}
 
 export default async function HqDailyPage({ searchParams }: { searchParams: Promise<{ year?: string, month?: string }> }) {
     const staff = await getCurrentStaff()
@@ -31,10 +93,11 @@ export default async function HqDailyPage({ searchParams }: { searchParams: Prom
 
     const matrixData = matrixResponse.success ? (matrixResponse.data || []) : []
     if (!matrixResponse.success) {
-        // Log error or show toast? Server component, so maybe just empty or error state?
-        // Ideally pass error to client component but for now simplified.
         console.error('HQ Daily Data fetch failed:', matrixResponse.error)
     }
+
+    // Extract Yorisol data for reconciliation
+    const { mealData, additionData } = extractYorisolData(matrixData)
 
     // Fetch facilities for BillingImporter
     const supabase = await createClient()
@@ -79,12 +142,11 @@ export default async function HqDailyPage({ searchParams }: { searchParams: Prom
 
             <div className="flex flex-col gap-4">
                 <BillingImporter
-                    facilityId={staff.facility_id || ''} // Will be empty for Global Admin, triggering dropdown
+                    facilityId={staff.facility_id || ''}
                     date={new Date(year, month - 1, 1)}
                     facilities={facilities || []}
-                    onSuccess={async () => {
-                        'use server'
-                    }}
+                    yorisolMealData={mealData}
+                    yorisolAdditionData={additionData}
                 />
 
                 <Suspense fallback={<div className="p-10 text-center">読み込み中...</div>}>
@@ -99,3 +161,4 @@ export default async function HqDailyPage({ searchParams }: { searchParams: Prom
         </div>
     )
 }
+

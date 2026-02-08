@@ -3,84 +3,154 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Upload, Loader2, FileUp } from 'lucide-react'
+import { Loader2, FileSpreadsheet, Scale } from 'lucide-react'
 import { toast } from 'sonner'
-import { importBillingCsv } from '@/app/actions/hq/import-billing-csv'
-
 import { useRouter } from 'next/navigation'
-
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ReconciliationResultDialog } from './reconciliation-result-dialog'
+import {
+    detectCsvType,
+    reconcileSSK02,
+    reconcileCKDCSV002,
+    type ReconciliationResult
+} from '@/app/actions/hq/reconcile-billing-csv'
 
 interface BillingImporterProps {
     facilityId: string
     date: Date
     onSuccess?: () => void
     facilities?: { id: string, name: string }[]
+    // Yorisol data for reconciliation
+    yorisolMealData?: {
+        residentId: string
+        residentName: string
+        breakfastCount: number
+        lunchCount: number
+        dinnerCount: number
+    }[]
+    yorisolAdditionData?: {
+        residentId: string
+        residentName: string
+        dayActivityCount: number
+        nightShiftCount: number
+        medicalIV1Count: number
+        medicalIV2Count: number
+        medicalIV3Count: number
+    }[]
 }
 
-export function BillingImporter({ facilityId, date, onSuccess, facilities = [] }: BillingImporterProps) {
+export function BillingImporter({
+    facilityId,
+    date,
+    onSuccess,
+    facilities = [],
+    yorisolMealData = [],
+    yorisolAdditionData = []
+}: BillingImporterProps) {
     const router = useRouter()
-    const [file, setFile] = useState<File | null>(null)
     const [selectedFacilityId, setSelectedFacilityId] = useState(facilityId)
-    const [isUploading, setIsUploading] = useState(false)
 
-    // Sync selected if prop changes (though usually static in this usage)
-    // useEffect(() => { setSelectedFacilityId(facilityId) }, [facilityId])
+    // SSK02
+    const [ssk02File, setSsk02File] = useState<File | null>(null)
+    const [isSsk02Processing, setIsSsk02Processing] = useState(false)
 
-    const handleUpload = async () => {
-        if (!file) return
-        const targetFacilityId = selectedFacilityId
-        if (!targetFacilityId) {
-            toast.error('施設を選択してください')
-            return
-        }
+    // CKDCSV002
+    const [ckdFile, setCkdFile] = useState<File | null>(null)
+    const [isCkdProcessing, setIsCkdProcessing] = useState(false)
 
-        setIsUploading(true)
-        const formData = new FormData()
-        formData.append('file', file)
-        formData.append('facilityId', targetFacilityId)
-        // Format date as YYYY-MM-DD (first of month)
-        const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`
-        formData.append('date', dateStr)
+    // Result dialog
+    const [resultDialogOpen, setResultDialogOpen] = useState(false)
+    const [reconciliationResult, setReconciliationResult] = useState<ReconciliationResult | null>(null)
 
+    const handleReconcileSSK02 = async () => {
+        if (!ssk02File) return
+
+        setIsSsk02Processing(true)
         try {
-            const result = await importBillingCsv(formData)
+            const buffer = await ssk02File.arrayBuffer()
+            const result = await reconcileSSK02(
+                Buffer.from(buffer),
+                yorisolMealData
+            )
+
+            setReconciliationResult(result)
+            setResultDialogOpen(true)
+
             if (result.success) {
-                toast.success('CSVインポート完了', {
-                    description: `${result.count}件のデータを読み込みました`
-                })
-                setFile(null)
-                router.refresh()
-                if (onSuccess) onSuccess()
+                if (result.mismatchCount === 0) {
+                    toast.success('突合完了：全件一致', {
+                        description: `${result.matchCount}件が一致しました`
+                    })
+                } else {
+                    toast.warning('突合完了：不一致あり', {
+                        description: `${result.mismatchCount}件の不一致があります`
+                    })
+                }
             } else {
-                toast.error('インポート失敗', {
-                    description: result.error
-                })
+                toast.error('突合エラー', { description: result.error })
             }
-        } catch (e) {
+        } catch (e: any) {
             toast.error('予期せぬエラーが発生しました')
         } finally {
-            setIsUploading(false)
+            setIsSsk02Processing(false)
+        }
+    }
+
+    const handleReconcileCKD = async () => {
+        if (!ckdFile) return
+
+        setIsCkdProcessing(true)
+        try {
+            const buffer = await ckdFile.arrayBuffer()
+            const result = await reconcileCKDCSV002(
+                Buffer.from(buffer),
+                yorisolAdditionData,
+                date.getFullYear(),
+                date.getMonth() + 1
+            )
+
+            setReconciliationResult(result)
+            setResultDialogOpen(true)
+
+            if (result.success) {
+                if (result.mismatchCount === 0) {
+                    toast.success('突合完了：全件一致', {
+                        description: `${result.matchCount}件が一致しました`
+                    })
+                } else {
+                    toast.warning('突合完了：不一致あり', {
+                        description: `${result.mismatchCount}件の不一致があります`
+                    })
+                }
+            } else {
+                toast.error('突合エラー', { description: result.error })
+            }
+        } catch (e: any) {
+            toast.error('予期せぬエラーが発生しました')
+        } finally {
+            setIsCkdProcessing(false)
         }
     }
 
     return (
-        <div className="flex items-center gap-2 p-4 bg-white rounded-md border shadow-sm flex-wrap">
-            <div className="bg-blue-50 p-2 rounded-full hidden sm:block">
-                <FileUp className="w-5 h-5 text-blue-600" />
-            </div>
-            <div className="flex-1 min-w-[300px]">
-                <div className="flex items-baseline justify-between mb-1">
-                    <p className="text-sm font-bold">請求データCSV取込</p>
-                    {!facilityId && facilities.length > 0 && (
-                        <span className="text-xs text-red-500 font-bold ml-2">※施設を選択してください</span>
-                    )}
+        <>
+            <div className="p-4 bg-white rounded-md border shadow-sm space-y-4">
+                <div className="flex items-center gap-2 mb-2">
+                    <div className="bg-blue-50 p-2 rounded-full">
+                        <Scale className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                        <p className="font-bold">請求データ突合</p>
+                        <p className="text-xs text-gray-500">CSVファイルをアップロードしてYorisolデータと比較</p>
+                    </div>
                 </div>
 
-                <div className="flex gap-2 flex-wrap">
-                    {!facilityId && facilities.length > 0 && (
+                {/* 施設選択（管理者向け） */}
+                {!facilityId && facilities.length > 0 && (
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600">施設:</span>
                         <Select value={selectedFacilityId} onValueChange={setSelectedFacilityId}>
-                            <SelectTrigger className="w-[180px] h-9 text-sm">
+                            <SelectTrigger className="w-[200px] h-9 text-sm">
                                 <SelectValue placeholder="施設を選択" />
                             </SelectTrigger>
                             <SelectContent>
@@ -91,26 +161,74 @@ export function BillingImporter({ facilityId, date, onSuccess, facilities = [] }
                                 ))}
                             </SelectContent>
                         </Select>
-                    )}
+                    </div>
+                )}
 
+                {/* SSK02（食事） */}
+                <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg flex-wrap">
+                    <div className="flex items-center gap-2 min-w-[120px]">
+                        <FileSpreadsheet className="w-4 h-4 text-green-600" />
+                        <span className="text-sm font-medium">SSK02</span>
+                        <span className="text-xs text-gray-500">（食事）</span>
+                    </div>
                     <Input
                         type="file"
                         accept=".csv"
-                        onChange={(e) => setFile(e.target.files?.[0] || null)}
-                        disabled={isUploading}
-                        className="h-9 text-sm w-auto grow min-w-[200px]"
+                        onChange={(e) => setSsk02File(e.target.files?.[0] || null)}
+                        disabled={isSsk02Processing}
+                        className="h-9 text-sm flex-1 min-w-[200px]"
                     />
                     <Button
-                        onClick={handleUpload}
-                        disabled={!file || isUploading || !selectedFacilityId}
+                        onClick={handleReconcileSSK02}
+                        disabled={!ssk02File || isSsk02Processing || yorisolMealData.length === 0}
                         size="sm"
-                        className="bg-blue-600 hover:bg-blue-700 text-white shrink-0"
+                        className="bg-green-600 hover:bg-green-700 text-white"
                     >
-                        {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
-                        アップロード
+                        {isSsk02Processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scale className="w-4 h-4 mr-1" />}
+                        突合
                     </Button>
                 </div>
+
+                {/* CKDCSV002（加算） */}
+                <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg flex-wrap">
+                    <div className="flex items-center gap-2 min-w-[120px]">
+                        <FileSpreadsheet className="w-4 h-4 text-purple-600" />
+                        <span className="text-sm font-medium">CKDCSV002</span>
+                        <span className="text-xs text-gray-500">（加算）</span>
+                    </div>
+                    <Input
+                        type="file"
+                        accept=".csv"
+                        onChange={(e) => setCkdFile(e.target.files?.[0] || null)}
+                        disabled={isCkdProcessing}
+                        className="h-9 text-sm flex-1 min-w-[200px]"
+                    />
+                    <Button
+                        onClick={handleReconcileCKD}
+                        disabled={!ckdFile || isCkdProcessing || yorisolAdditionData.length === 0}
+                        size="sm"
+                        className="bg-purple-600 hover:bg-purple-700 text-white"
+                    >
+                        {isCkdProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scale className="w-4 h-4 mr-1" />}
+                        突合
+                    </Button>
+                </div>
+
+                {/* データなし警告 */}
+                {yorisolMealData.length === 0 && yorisolAdditionData.length === 0 && (
+                    <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                        ⚠️ 突合対象のYorisolデータがありません。業務日誌を確定してください。
+                    </p>
+                )}
             </div>
-        </div>
+
+            <ReconciliationResultDialog
+                open={resultDialogOpen}
+                onOpenChange={setResultDialogOpen}
+                result={reconciliationResult}
+                year={date.getFullYear()}
+                month={date.getMonth() + 1}
+            />
+        </>
     )
 }
