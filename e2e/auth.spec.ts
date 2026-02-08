@@ -19,11 +19,22 @@ test('login flow', async ({ page }) => {
         await page.fill('input[type="password"]', testPassword);
         await page.click('button[type="submit"]');
 
-        // Wait for navigation to dashboard (adjust timeout if cold start is slow)
-        await expect(page).toHaveURL('/', { timeout: 15000 });
-
-        // Check for dashboard element (e.g., header or sidebar)
-        await expect(page.locator('header')).toBeVisible();
+        // Wait for dashboard OR error message
+        try {
+            // Increase timeout to 30s for CI cold start
+            await expect(page).toHaveURL('/', { timeout: 30000 });
+            // Check for dashboard element
+            await expect(page.locator('header')).toBeVisible();
+        } catch (e) {
+            // Check if there is an error message displayed
+            const errorAlert = page.locator('.text-red-500');
+            if (await errorAlert.isVisible()) {
+                const text = await errorAlert.textContent();
+                console.error(`Login failed with UI error: ${text}`);
+                throw new Error(`Login failed with UI error: ${text}`);
+            }
+            throw e;
+        }
     } else {
         console.log('Skipping real login test: No credentials provided in environment.');
     }
