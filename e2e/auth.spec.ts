@@ -20,18 +20,28 @@ test('login flow', async ({ page }) => {
         await page.click('button[type="submit"]');
 
         // Wait for dashboard OR error message
+        // Wait for dashboard OR error message
         try {
-            // Increase timeout to 30s for CI cold start
-            await expect(page).toHaveURL('/', { timeout: 30000 });
+            console.log('Login clicked, waiting for navigation...');
+            // Increase timeout to 60s for Supabase free tier cold start
+            await expect(page).toHaveURL('/', { timeout: 60000 });
+            console.log('Navigation to dashboard successful');
             // Check for dashboard element
             await expect(page.locator('header')).toBeVisible();
         } catch (e) {
-            // Check if there is an error message displayed
-            const errorAlert = page.locator('.text-red-500');
-            if (await errorAlert.isVisible()) {
-                const text = await errorAlert.textContent();
-                console.error(`Login failed with UI error: ${text}`);
-                throw new Error(`Login failed with UI error: ${text}`);
+            console.log(`Login wait failed. Current URL: ${page.url()}`);
+
+            // Try to recover context to check for error message
+            try {
+                const errorAlert = page.locator('.text-red-500');
+                // Use a short timeout for this check to avoid hanging if closed
+                if (await errorAlert.isVisible({ timeout: 5000 })) {
+                    const text = await errorAlert.textContent();
+                    console.error(`Login failed with UI error: ${text}`);
+                    throw new Error(`Login failed with UI error: ${text}`);
+                }
+            } catch (innerE) {
+                console.log('Could not check for UI error alert (page might be closed)');
             }
             throw e;
         }
