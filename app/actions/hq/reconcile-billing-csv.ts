@@ -106,10 +106,30 @@ interface YorisolMealData {
 }
 
 export async function reconcileSSK02(
-    csvBuffer: Buffer,
-    yorisolData: YorisolMealData[]
+    formData: FormData
 ): Promise<ReconciliationResult> {
     try {
+        const file = formData.get('file') as File
+        const yorisolDataJson = formData.get('yorisolData') as string
+
+        if (!file) {
+            return {
+                success: false,
+                csvType: 'SSK02',
+                totalItems: 0,
+                matchCount: 0,
+                mismatchCount: 0,
+                noCsvDataCount: 0,
+                noYorisolDataCount: 0,
+                items: [],
+                error: 'ファイルがありません'
+            }
+        }
+
+        const yorisolData: YorisolMealData[] = JSON.parse(yorisolDataJson || '[]')
+
+        const arrayBuffer = await file.arrayBuffer()
+        const csvBuffer = Buffer.from(arrayBuffer)
         const rows = parseCSV(csvBuffer)
 
         if (rows.length < 2) {
@@ -233,12 +253,32 @@ interface YorisolAdditionData {
 }
 
 export async function reconcileCKDCSV002(
-    csvBuffer: Buffer,
-    yorisolData: YorisolAdditionData[],
-    targetYear: number,
-    targetMonth: number
+    formData: FormData
 ): Promise<ReconciliationResult> {
     try {
+        const file = formData.get('file') as File
+        const yorisolDataJson = formData.get('yorisolData') as string
+        const targetYear = parseInt(formData.get('targetYear') as string, 10)
+        const targetMonth = parseInt(formData.get('targetMonth') as string, 10)
+
+        if (!file) {
+            return {
+                success: false,
+                csvType: 'CKDCSV002',
+                totalItems: 0,
+                matchCount: 0,
+                mismatchCount: 0,
+                noCsvDataCount: 0,
+                noYorisolDataCount: 0,
+                items: [],
+                error: 'ファイルがありません'
+            }
+        }
+
+        const yorisolData: YorisolAdditionData[] = JSON.parse(yorisolDataJson || '[]')
+
+        const arrayBuffer = await file.arrayBuffer()
+        const csvBuffer = Buffer.from(arrayBuffer)
         const rows = parseCSV(csvBuffer)
 
         if (rows.length < 2) {

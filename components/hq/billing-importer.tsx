@@ -67,11 +67,11 @@ export function BillingImporter({
 
         setIsSsk02Processing(true)
         try {
-            const buffer = await ssk02File.arrayBuffer()
-            const result = await reconcileSSK02(
-                Buffer.from(buffer),
-                yorisolMealData
-            )
+            const formData = new FormData()
+            formData.append('file', ssk02File)
+            formData.append('yorisolData', JSON.stringify(yorisolMealData))
+
+            const result = await reconcileSSK02(formData)
 
             setReconciliationResult(result)
             setResultDialogOpen(true)
@@ -101,13 +101,13 @@ export function BillingImporter({
 
         setIsCkdProcessing(true)
         try {
-            const buffer = await ckdFile.arrayBuffer()
-            const result = await reconcileCKDCSV002(
-                Buffer.from(buffer),
-                yorisolAdditionData,
-                date.getFullYear(),
-                date.getMonth() + 1
-            )
+            const formData = new FormData()
+            formData.append('file', ckdFile)
+            formData.append('yorisolData', JSON.stringify(yorisolAdditionData))
+            formData.append('targetYear', date.getFullYear().toString())
+            formData.append('targetMonth', (date.getMonth() + 1).toString())
+
+            const result = await reconcileCKDCSV002(formData)
 
             setReconciliationResult(result)
             setResultDialogOpen(true)
