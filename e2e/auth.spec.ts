@@ -6,7 +6,9 @@ test('login flow', async ({ page }) => {
 
     // Verify we are on the login page
     await expect(page).toHaveURL(/\/login/);
-    await expect(page.locator('h1')).toContainText('介護帳票管理システム');
+    // Check for logo image instead of H1 text since text was removed/replaced by logo
+    await expect(page.locator('img[alt="Yorisol"]')).toBeVisible();
+    await expect(page.getByText('メールアドレスとパスワードを入力してください')).toBeVisible();
 
     // 2. Perform Login (Simulated credentials)
     // For safety, we can define dummy credentials or use placeholders.

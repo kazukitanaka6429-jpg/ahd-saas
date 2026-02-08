@@ -4,4 +4,7 @@ module.exports = {
     testEnvironment: 'jsdom',
     // Look for tests in __tests__ folder
     testMatch: ['**/__tests__/**/*.test.ts'],
+    moduleNameMapper: {
+        '^@/(.*)$': '<rootDir>/$1',
+    },
 };
