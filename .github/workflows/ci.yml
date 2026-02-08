@@ -62,7 +62,8 @@ jobs:
       run: npx playwright test
       env:
         CI: true
-        # Production build is usually better for E2E but dev server is faster for quick check
-        # We configured webServer in playwright.config.ts
-        NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co"
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: "dummy-key"
+        # Use real secrets for robust testing
+        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+        TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
