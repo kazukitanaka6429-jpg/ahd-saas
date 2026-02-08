@@ -14,8 +14,8 @@ test('login flow', async ({ page }) => {
     // For safety, we can define dummy credentials or use placeholders.
     // We can't actually log in without valid credentials in this automated test unless we have a seeded user.
     // Instead, let's verify the inputs exist.
-    await expect(page.locator('input[name="email"]')).toBeVisible();
-    await expect(page.locator('input[name="password"]')).toBeVisible();
+    await expect(page.locator('input[type="email"]')).toBeVisible();
+    await expect(page.locator('input[type="password"]')).toBeVisible();
     await expect(page.locator('button[type="submit"]')).toBeVisible();
 
     // If we had credentials, we'd do:
