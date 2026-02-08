@@ -64,6 +64,7 @@ export default async function MedicalVPage({
     }
 
     // Fetch facility name for display
+    const supabase = await createClient()
     const { data: facilityData } = await supabase
         .from('facilities')
         .select('name')
