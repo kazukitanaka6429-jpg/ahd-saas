@@ -45,7 +45,7 @@ function extractYorisolData(matrixData: ResidentMatrixData[]) {
         const dinnerRow = rows.find(r => r.key === 'meal_dinner')
 
         mealData.push({
-            residentId: resident.id,
+            residentId: String(resident.display_id ?? ''),
             residentName: resident.name,
             breakfastCount: countTrues(breakfastRow),
             lunchCount: countTrues(lunchRow),
@@ -59,7 +59,7 @@ function extractYorisolData(matrixData: ResidentMatrixData[]) {
         const iv3Row = rows.find(r => r.key === 'medical_iv_3')
 
         additionData.push({
-            residentId: resident.id,
+            residentId: String(resident.display_id ?? ''),
             residentName: resident.name,
             dayActivityCount: countTrues(dayActivityRow),
             nightShiftCount: countTrues(nightShiftRow),
