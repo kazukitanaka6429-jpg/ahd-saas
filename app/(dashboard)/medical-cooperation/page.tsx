@@ -4,7 +4,6 @@ import { requireAuth } from '@/lib/auth-helpers'
 import { getUnits } from '@/app/actions/units'
 import { MedicalCooperationGrid } from '@/components/features/medical-cooperation/medical-cooperation-grid'
 import { MonthSelector } from '@/components/features/medical-cooperation/month-selector'
-import { FacilitySwitcher } from '@/components/common/facility-switcher'
 import { Metadata } from 'next'
 import { cookies } from 'next/headers'
 
@@ -109,6 +108,14 @@ export default async function MedicalCooperationPage({
     // Fetch units
     const { data: units } = await getUnits()
 
+    // Fetch facility name for display
+    const { data: facilityData } = await supabase
+        .from('facilities')
+        .select('name')
+        .eq('id', facilityId)
+        .single()
+    const facilityName = facilityData?.name || '施設未選択'
+
     return (
         <div className="h-full flex flex-col space-y-4 pb-8">
             <div className="flex items-center justify-between mb-2">
@@ -118,7 +125,7 @@ export default async function MedicalCooperationPage({
                         看護職員による夜間の訪問・対応記録
                     </p>
                     <div className="mt-2">
-                        <FacilitySwitcher variant="header" />
+                        <span className="text-sm text-muted-foreground bg-gray-100 px-2 py-1 rounded">{facilityName}</span>
                     </div>
                 </div>
                 <div>

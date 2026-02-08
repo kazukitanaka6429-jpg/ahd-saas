@@ -9,7 +9,6 @@ import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 
 import { GlobalSaveProvider } from '@/components/providers/global-save-context'
-import { FacilitySwitcher } from '@/components/common/facility-switcher'
 import { ResetDailyReportButton } from '@/components/features/daily-report/reset-daily-report-button'
 
 // Streaming Components
@@ -66,6 +65,14 @@ export default async function DailyReportsPage({
     const today = (typeof dateParam === 'string' ? dateParam : undefined) || new Date().toISOString().split('T')[0]
     const displayDate = format(new Date(today), 'yyyy年M月d日(EEE)', { locale: ja })
 
+    // Fetch facility name for display
+    const { data: facilityData } = await supabase
+        .from('facilities')
+        .select('name')
+        .eq('id', facilityId)
+        .single()
+    const facilityName = facilityData?.name || '施設未選択'
+
     // Feedback Comments (Lightweight, so fetch normally or could be another suspense)
     // Decided to keep it in main shell or move to its own? 
     // It's at the bottom, so lazy loading is perfect.
@@ -80,7 +87,7 @@ export default async function DailyReportsPage({
                 <div className="flex items-end justify-between border-b pb-4">
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight text-gray-900 mb-1">📓 業務日誌</h1>
-                        <FacilitySwitcher variant="header" />
+                        <span className="text-sm text-muted-foreground bg-gray-100 px-2 py-1 rounded">{facilityName}</span>
                     </div>
                     <div className="flex flex-col items-end gap-2">
                         <DateSelector date={today} />

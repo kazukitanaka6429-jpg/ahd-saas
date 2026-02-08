@@ -3,7 +3,6 @@ import { getUnits } from '@/app/actions/units'
 import { requireAuth } from '@/lib/auth-helpers'
 import { MedicalVGrid } from '@/components/features/medical-v/medical-v-grid'
 import { MonthSelector } from '@/components/medical-v/month-selector'
-import { FacilitySwitcher } from '@/components/common/facility-switcher'
 
 import { createClient } from '@/lib/supabase/server'
 
@@ -64,6 +63,14 @@ export default async function MedicalVPage({
         resolvedFacilityId = residents[0].facility_id
     }
 
+    // Fetch facility name for display
+    const { data: facilityData } = await supabase
+        .from('facilities')
+        .select('name')
+        .eq('id', resolvedFacilityId || '')
+        .single()
+    const facilityName = facilityData?.name || '施設未選択'
+
     return (
         <div className="space-y-6 pt-6 pb-20 px-6 max-w-[100vw] overflow-hidden">
             <div className="flex flex-col md:flex-row md:items-end justify-between border-b pb-4 gap-4">
@@ -75,7 +82,7 @@ export default async function MedicalVPage({
                         指導看護師数と実施記録を入力し、請求単位数を自動計算します。
                     </p>
                     <div className="mt-2 text-left">
-                        <FacilitySwitcher variant="header" />
+                        <span className="text-sm text-muted-foreground bg-gray-100 px-2 py-1 rounded">{facilityName}</span>
                     </div>
                 </div>
                 <div className="flex items-center gap-4">

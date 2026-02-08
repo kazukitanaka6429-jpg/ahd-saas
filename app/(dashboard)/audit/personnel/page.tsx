@@ -10,7 +10,7 @@ import { format } from "date-fns"
 import { ja } from "date-fns/locale"
 import { AuditDateNavigator } from "@/components/features/audit/date-navigator"
 import { PdfPrintButton } from "@/components/features/audit/pdf-print-button"
-import { FacilitySwitcher } from "@/components/common/facility-switcher"
+import { createClient } from "@/lib/supabase/server"
 
 // This is a Server Component
 export default async function PersonnelAuditPage({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
@@ -30,15 +30,22 @@ export default async function PersonnelAuditPage({ searchParams }: { searchParam
     // Formatting for display
     const dateDisplay = format(new Date(date), "yyyy年M月d日 (E)", { locale: ja })
 
+    // Fetch facility name for display
+    const supabase = await createClient()
+    const { data: facilityDataResult } = await supabase
+        .from('facilities')
+        .select('name')
+        .eq('id', data.facilityId)
+        .single()
+    const facilityName = facilityDataResult?.name || '施設未選択'
+
     return (
         <div className="container mx-auto py-6 space-y-6 print:space-y-4 print:py-2">
             <div className="flex flex-col gap-4 print:hidden">
                 <h1 className="text-2xl font-bold tracking-tight">人員配置チェック</h1>
                 <div className="flex items-center justify-between flex-wrap gap-4">
                     <div className="flex items-center gap-4">
-                        <div className="w-[260px]">
-                            <FacilitySwitcher />
-                        </div>
+                        <span className="text-sm text-muted-foreground bg-gray-100 px-2 py-1 rounded">{facilityName}</span>
                         <AuditDateNavigator date={date} />
                     </div>
                     <div className="flex gap-2">
