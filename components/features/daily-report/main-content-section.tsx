@@ -23,7 +23,7 @@ export async function MainContentSection({
         getDailyMatrix(date, facilityId),
         getFindingsCountByRecord(date),
         getShortStayRecord(date, facilityId),
-        getUnits()
+        getUnits(facilityId)
     ])
 
     const residents = matrixRes.data?.residents || []
