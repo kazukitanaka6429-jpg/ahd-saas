@@ -88,7 +88,7 @@ export async function importResidents(formData: FormData) {
                 name: name,
                 display_id: displayId || null,
                 unit_id: unitId,
-                move_in_date: moveInDate,
+                start_date: moveInDate || new Date().toISOString().split('T')[0], // Required field
                 status: 'in_facility' // Default status
             })
             successCount++
