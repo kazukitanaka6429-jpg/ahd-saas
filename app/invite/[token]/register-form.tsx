@@ -8,13 +8,16 @@ import { toast } from 'sonner'
 import { registerUser } from './actions'
 import { useRouter } from 'next/navigation'
 
-export function RegisterForm({ invitation }: { invitation: any }) {
+export function RegisterForm({ staff, token }: { staff: any, token: string }) {
     const [loading, setLoading] = useState(false)
     const router = useRouter()
 
     const handleSubmit = async (formData: FormData) => {
         setLoading(true)
+        const email = formData.get('email') as string
         const password = formData.get('password') as string
+        // Use staff name as default if not modified, or allow confirming name?
+        // Form field 'name' is there. Let's keep it.
         const name = formData.get('name') as string
 
         if (password.length < 6) {
@@ -23,7 +26,7 @@ export function RegisterForm({ invitation }: { invitation: any }) {
             return
         }
 
-        const result = await registerUser(invitation.token, password, name)
+        const result = await registerUser(token, email, password, name)
 
         if (result.error) {
             toast.error(result.error)
@@ -37,8 +40,26 @@ export function RegisterForm({ invitation }: { invitation: any }) {
     return (
         <form action={handleSubmit} className="space-y-4">
             <div className="space-y-2">
+                <Label htmlFor="email">メールアドレス</Label>
+                <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    required
+                    placeholder="name@example.com"
+                    defaultValue={staff.email || ''}
+                />
+            </div>
+
+            <div className="space-y-2">
                 <Label htmlFor="name">氏名</Label>
-                <Input id="name" name="name" required placeholder="例: 山田 花子" />
+                <Input
+                    id="name"
+                    name="name"
+                    required
+                    placeholder="例: 山田 花子"
+                    defaultValue={staff.name || ''}
+                />
             </div>
 
             <div className="space-y-2">
