@@ -266,12 +266,14 @@ export async function saveMedicalVDataBulk(
                 // If not updated in this batch, ensure it exists
                 const daily = await ensureDailyRecord(supabase, facilityId as string, r.date, targetCount)
                 dailyId = daily.id
-                dailyIdCache.set(r.date, dailyId)
+                if (dailyId) dailyIdCache.set(r.date, dailyId)
             }
 
             // Upsert/Delete Record
             // Note: using facility_id and date for lookup might be faster if index exists, 
             // but unique constraint is (daily_id, resident_id) typically.
+            if (!dailyId) continue
+
             const { data: existing } = await supabase.from('medical_coord_v_records')
                 .select('id')
                 .eq('medical_coord_v_daily_id', dailyId)
