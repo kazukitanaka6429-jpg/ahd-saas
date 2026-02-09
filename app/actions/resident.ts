@@ -380,6 +380,66 @@ async function checkResidentRelatedData(supabase: any, residentId: string): Prom
         }
     }
 
+    // 5. 医療連携 (medical_cooperation_records)
+    const { data: medicalCoop } = await supabase
+        .from('medical_cooperation_records')
+        .select('date')
+        .eq('resident_id', residentId)
+        .order('date', { ascending: false })
+        .limit(1)
+
+    if (medicalCoop && medicalCoop.length > 0) {
+        const date = new Date(medicalCoop[0].date)
+        return {
+            hasData: true,
+            message: `${date.getMonth() + 1}月${date.getDate()}日に医療連携の記録があるため削除できません。先に関連データを削除してください。`
+        }
+    }
+
+    // 6. 医療連携V (medical_coord_v_records)
+    const { data: medicalV } = await supabase
+        .from('medical_coord_v_records')
+        .select('id')
+        .eq('resident_id', residentId)
+        .limit(1)
+
+    if (medicalV && medicalV.length > 0) {
+        return {
+            hasData: true,
+            message: `医療連携Vの記録があるため削除できません。先に関連データを削除してください。`
+        }
+    }
+
+    // 7. 操作ログ (operation_logs)
+    const { data: operationLogs } = await supabase
+        .from('operation_logs')
+        .select('target_date')
+        .eq('target_resident_id', residentId)
+        .order('target_date', { ascending: false })
+        .limit(1)
+
+    if (operationLogs && operationLogs.length > 0) {
+        const date = new Date(operationLogs[0].target_date)
+        return {
+            hasData: true,
+            message: `${date.getMonth() + 1}月${date.getDate()}日に操作ログの記録があるため削除できません。先に関連データを削除してください。`
+        }
+    }
+
+    // 8. 指摘コメント (finding_comments)
+    const { data: findingComments } = await supabase
+        .from('finding_comments')
+        .select('id')
+        .eq('resident_id', residentId)
+        .limit(1)
+
+    if (findingComments && findingComments.length > 0) {
+        return {
+            hasData: true,
+            message: `指摘コメントの記録があるため削除できません。先に関連データを削除してください。`
+        }
+    }
+
     return { hasData: false, message: '' }
 }
 
