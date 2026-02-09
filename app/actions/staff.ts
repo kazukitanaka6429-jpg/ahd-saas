@@ -207,6 +207,12 @@ export async function deleteStaff(staffId: string) {
 
         const supabase = await createClient()
 
+        // 削除前に関連データをチェック
+        const relatedCheck = await checkStaffRelatedData(supabase, staffId)
+        if (relatedCheck.hasData) {
+            return { error: relatedCheck.message }
+        }
+
         // Log pre-deletion warning
         logger.warn(`削除試行: User ${currentStaff.id} is deleting Staff ${staffId}`, {
             actor: currentStaff.id,
@@ -258,6 +264,28 @@ export async function deleteStaff(staffId: string) {
         return { error: '予期せぬエラーが発生しました' }
     }
 }
+
+// 職員に関連するデータをチェックし、削除可能かを判定
+async function checkStaffRelatedData(supabase: any, staffId: string): Promise<{ hasData: boolean; message: string }> {
+    // 1. シフト (daily_shifts)
+    const { data: dailyShifts } = await supabase
+        .from('daily_shifts')
+        .select('date')
+        .eq('staff_id', staffId)
+        .order('date', { ascending: false })
+        .limit(1)
+
+    if (dailyShifts && dailyShifts.length > 0) {
+        const date = new Date(dailyShifts[0].date)
+        return {
+            hasData: true,
+            message: `${date.getMonth() + 1}月${date.getDate()}日にシフトの記録があるため削除できません。先に関連データを削除してください。`
+        }
+    }
+
+    return { hasData: false, message: '' }
+}
+
 
 export type SimpleStaff = {
     id: string

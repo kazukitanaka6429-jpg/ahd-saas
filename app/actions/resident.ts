@@ -273,6 +273,12 @@ export async function deleteResident(id: string) {
 
         const supabase = await createClient()
 
+        // 削除前に関連データをチェック
+        const relatedCheck = await checkResidentRelatedData(supabase, id)
+        if (relatedCheck.hasData) {
+            return { error: relatedCheck.message }
+        }
+
         // Log pre-deletion warning
         logger.warn(`削除試行: User ${staff.id} is deleting Resident ${id}`, {
             actor: staff.id,
@@ -306,3 +312,74 @@ export async function deleteResident(id: string) {
         return { error: translateError('Unexpected Error') }
     }
 }
+
+// 利用者に関連するデータをチェックし、削除可能かを判定
+async function checkResidentRelatedData(supabase: any, residentId: string): Promise<{ hasData: boolean; message: string }> {
+    // 1. 業務日誌 (daily_records)
+    const { data: dailyRecords } = await supabase
+        .from('daily_records')
+        .select('date')
+        .eq('resident_id', residentId)
+        .order('date', { ascending: false })
+        .limit(1)
+
+    if (dailyRecords && dailyRecords.length > 0) {
+        const date = new Date(dailyRecords[0].date)
+        return {
+            hasData: true,
+            message: `${date.getMonth() + 1}月${date.getDate()}日に業務日誌の記録があるため削除できません。先に関連データを削除してください。`
+        }
+    }
+
+    // 2. 外泊/入院 (stay_periods)
+    const { data: stayPeriods } = await supabase
+        .from('stay_periods')
+        .select('start_date, type')
+        .eq('resident_id', residentId)
+        .order('start_date', { ascending: false })
+        .limit(1)
+
+    if (stayPeriods && stayPeriods.length > 0) {
+        const date = new Date(stayPeriods[0].start_date)
+        const typeLabel = stayPeriods[0].type === 'hospitalization' ? '入院' : '外泊'
+        return {
+            hasData: true,
+            message: `${date.getMonth() + 1}月${date.getDate()}日に${typeLabel}の記録があるため削除できません。先に関連データを削除してください。`
+        }
+    }
+
+    // 3. 短期入所 (short_stay_records)
+    const { data: shortStayRecords } = await supabase
+        .from('short_stay_records')
+        .select('date')
+        .eq('resident_id', residentId)
+        .order('date', { ascending: false })
+        .limit(1)
+
+    if (shortStayRecords && shortStayRecords.length > 0) {
+        const date = new Date(shortStayRecords[0].date)
+        return {
+            hasData: true,
+            message: `${date.getMonth() + 1}月${date.getDate()}日に短期入所の記録があるため削除できません。先に関連データを削除してください。`
+        }
+    }
+
+    // 4. report_entries
+    const { data: reportEntries } = await supabase
+        .from('report_entries')
+        .select('date')
+        .eq('resident_id', residentId)
+        .order('date', { ascending: false })
+        .limit(1)
+
+    if (reportEntries && reportEntries.length > 0) {
+        const date = new Date(reportEntries[0].date)
+        return {
+            hasData: true,
+            message: `${date.getMonth() + 1}月${date.getDate()}日に日誌明細の記録があるため削除できません。先に関連データを削除してください。`
+        }
+    }
+
+    return { hasData: false, message: '' }
+}
+
