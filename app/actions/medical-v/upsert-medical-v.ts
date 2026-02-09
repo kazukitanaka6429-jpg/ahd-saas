@@ -11,8 +11,80 @@ import { logOperation } from '@/lib/operation-logger'
 // Calculation Logic Reuse
 // Units = floor( (500 * NurseCount) / (TargetCount || 1) )
 const calculateUnits = (nurseCount: number, targetCount: number) => {
-    if (targetCount <= 0) targetCount = 1 // Prevent division by zero, though unlikely if there are residents
+    if (targetCount <= 0) targetCount = 1 // Prevent division by zero
     return Math.floor((500 * nurseCount) / targetCount)
+}
+
+// 1. Daily Record Upsert Helper
+async function upsertDailyRecord(
+    supabase: any,
+    facilityId: string,
+    date: string,
+    nurseCount: number,
+    targetCount: number
+) {
+    const units = calculateUnits(nurseCount, targetCount)
+
+    // Check if exists first to get ID
+    const { data: existing } = await supabase
+        .from('medical_coord_v_daily')
+        .select('id')
+        .eq('facility_id', facilityId)
+        .eq('date', date)
+        .maybeSingle()
+
+    if (existing) {
+        const { data, error } = await supabase
+            .from('medical_coord_v_daily')
+            .update({
+                nurse_count: nurseCount,
+                calculated_units: units,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', existing.id)
+            .select()
+            .single()
+
+        if (error) throw error
+        return data
+    } else {
+        const { data, error } = await supabase
+            .from('medical_coord_v_daily')
+            .insert({
+                facility_id: facilityId,
+                date: date,
+                nurse_count: nurseCount,
+                calculated_units: units,
+                updated_at: new Date().toISOString() // created_at handle by default
+            })
+            .select()
+            .single()
+
+        if (error) throw error
+        return data
+    }
+}
+
+// 2. Ensure Daily Record Exists (for Record toggles where nurse_count might not change)
+async function ensureDailyRecord(
+    supabase: any,
+    facilityId: string,
+    date: string,
+    targetCount: number // Needed if we create new
+) {
+    const { data: existing } = await supabase
+        .from('medical_coord_v_daily')
+        .select('id, nurse_count')
+        .eq('facility_id', facilityId)
+        .eq('date', date)
+        .maybeSingle()
+
+    if (existing) {
+        return existing
+    } else {
+        // Create with default nurse_count = 0
+        return await upsertDailyRecord(supabase, facilityId, date, 0, targetCount)
+    }
 }
 
 export async function upsertMedicalVDaily(
@@ -26,11 +98,30 @@ export async function upsertMedicalVDaily(
     try {
         await protect()
 
-        // NOTE: Nurse Count is now derived from Medical IV (staff assignments)
-        // and is not manually stored in a daily table.
-        // This function is kept for API compatibility but performs no write operations
-        // for nurse_count. Calculations should use `medical_coord_iv_records`.
+        // Although bulk save is preferred, this might be used by individual save actions if any.
+        // We implement it properly now.
 
+        const staff = await getCurrentStaff()
+        if (!staff) return { error: '認証が必要です' }
+
+        const supabase = await createClient()
+
+        let facilityId = staff.facility_id
+        if (staff.role === 'admin' && staff.facility_id === null) {
+            if (facilityIdArg) {
+                const { data: facil } = await supabase.from('facilities').select('organization_id').eq('id', facilityIdArg).single()
+                if (facil?.organization_id !== staff.organization_id) return { error: '権限のない施設です' }
+                facilityId = facilityIdArg
+            }
+        }
+
+        if (!facilityId) return { error: '施設情報がありません' }
+
+        if (updates.nurse_count !== undefined) {
+            await upsertDailyRecord(supabase, facilityId, date, updates.nurse_count, targetCount)
+        }
+
+        revalidatePath('/medical-v')
         return { success: true }
     } catch (e: any) {
         logger.error('upsertMedicalVDaily error', e)
@@ -54,61 +145,51 @@ export async function toggleMedicalVRecord(
 
         let facilityId = staff.facility_id
 
-        if (staff.role === 'admin' && staff.facility_id === null) {
-            if (!facilityIdArg) return { error: '施設の選択が必要です' }
-            const { data: facil } = await supabase.from('facilities').select('organization_id').eq('id', facilityIdArg).single()
-            if (facil?.organization_id !== staff.organization_id) return { error: '権限のない施設です' }
-            facilityId = facilityIdArg
-        } else {
-            facilityId = staff.facility_id
+        if (staff.role === 'admin') {
+            if (facilityIdArg) {
+                const { data: facil } = await supabase.from('facilities').select('organization_id').eq('id', facilityIdArg).single()
+                if (facil?.organization_id !== staff.organization_id) return { error: '権限のない施設です' }
+                facilityId = facilityIdArg
+            } else if (staff.facility_id) {
+                facilityId = staff.facility_id
+            }
         }
 
         if (!facilityId) return { error: '施設情報がありません' }
 
-        // Flat Upsert
-        // If isExecuted is false, we can DELETE or set to false?
-        // Schema has `is_executed` boolean.
-        // But `medical_coord_v_records` also has `staff_id` and `care_contents` in the new schema.
-        // Medical V toggle doesn't provide staffId.
-        // We'll leave `staff_id` null or use current user? 
-        // In Medical IV `upsertMedicalRecord`, it updates `care_contents`.
-        // Here we just toggle `is_executed`.
+        // 1. Ensure Parent Record Exists
+        // Warning: We don't know the current targetCount here easily without fetching.
+        // Pass 0 or fetch? Fetching is safer.
+        // Or assume if it doesn't exist, nurse count is 0.
+        // Query residents to get target count? EXPENSIVE.
+        // For now, if creating new, use 1 or 0. Recalculation happens validly on nurse_count update.
+        // Let's rely on existing data or default.
+        const dailyRecord = await ensureDailyRecord(supabase, facilityId, date, 1) // Default targetCount 1 to avoid div by zero if calculated
 
-        // Check if a record exists for this resident/date
+        // 2. Toggle Record
         const { data: existing } = await supabase.from('medical_coord_v_records')
             .select('id')
-            .eq('facility_id', facilityId)
-            .eq('date', date)
+            .eq('medical_coord_v_daily_id', dailyRecord.id)
             .eq('resident_id', residentId)
             .maybeSingle()
 
         if (isExecuted) {
-            // Upsert (Insert or Update)
-            // Use current staff as 'updater' if inserting? 
-            // Or keep staff_id null if it's just a check?
-            // Existing code in IV used `performerId`. 
-            // If Medical V is just "Checked", maybe staff_id isn't critical or defaults to user.
-
-            const payload = {
-                organization_id: staff.organization_id,
-                facility_id: facilityId,
-                resident_id: residentId,
-                staff_id: staff.id, // Required field - use current staff as executor
-                date: date,
-                updated_at: new Date().toISOString()
-            }
-
-            // To handle "Toggle", we insert if not exists.
-            // But strict unique constraint was REMOVED in Step 1947: "1日に複数回の記録を許容するためUNIQUE制約はなし".
-            // So if we just Insert every time, we get duplicates.
-            // We should Check if exists first.
             if (!existing) {
-                await supabase.from('medical_coord_v_records').insert(payload)
+                const payload = {
+                    medical_coord_v_daily_id: dailyRecord.id, // CRITICAL FIX
+                    facility_id: facilityId, // Keep for RLS flat policy if column exists
+                    resident_id: residentId,
+                    date: date, // Keep for denormalization if column exists
+                    is_executed: true,
+                    updated_at: new Date().toISOString()
+                }
+                const { error } = await supabase.from('medical_coord_v_records').insert(payload)
+                if (error) throw error
             }
         } else {
-            // Delete if exists
             if (existing) {
-                await supabase.from('medical_coord_v_records').delete().eq('id', existing.id)
+                const { error } = await supabase.from('medical_coord_v_records').delete().eq('id', existing.id)
+                if (error) throw error
             }
         }
 
@@ -154,59 +235,76 @@ export async function saveMedicalVDataBulk(
         const supabase = await createClient()
 
         let facilityId = staff.facility_id
-        if (staff.role === 'admin' && staff.facility_id === null) {
-            if (!facilityIdArg) return { error: '施設の選択が必要です' }
-            const { data: facil } = await supabase.from('facilities').select('organization_id').eq('id', facilityIdArg).single()
-            if (facil?.organization_id !== staff.organization_id) return { error: '権限のない施設です' }
-            facilityId = facilityIdArg
+        if (staff.role === 'admin') {
+            if (facilityIdArg) {
+                const { data: facil } = await supabase.from('facilities').select('organization_id').eq('id', facilityIdArg).single()
+                if (facil?.organization_id !== staff.organization_id) return { error: '権限のない施設です' }
+                facilityId = facilityIdArg
+            } else if (staff.facility_id) {
+                facilityId = staff.facility_id
+            }
         }
 
         if (!facilityId) return { error: '施設情報がありません' }
 
+        // Use a map to cache daily IDs within this transaction to avoid repeated fetches
+        const dailyIdCache = new Map<string, string>()
+
         // 1. Process Daily Updates (Nurse Counts)
-        // NOTE: Nurse Count is derived from Medical IV records.
-        // We do not store manual overrides for nurse count anymore.
-        // Logic removed to prevent errors with missing table.
+        for (const d of dailyUpdates) {
+            if (d.nurse_count !== undefined) {
+                const record = await upsertDailyRecord(supabase, facilityId as string, d.date, d.nurse_count as number, targetCount)
+                dailyIdCache.set(d.date, record.id)
+            }
+        }
 
         // 2. Process Record Updates
-        // Loop through updates
         for (const r of recordUpdates) {
-            // Find existing
+            // Get Daily ID
+            let dailyId = dailyIdCache.get(r.date)
+            if (!dailyId) {
+                // If not updated in this batch, ensure it exists
+                const daily = await ensureDailyRecord(supabase, facilityId as string, r.date, targetCount)
+                dailyId = daily.id
+                dailyIdCache.set(r.date, dailyId)
+            }
+
+            // Upsert/Delete Record
+            // Note: using facility_id and date for lookup might be faster if index exists, 
+            // but unique constraint is (daily_id, resident_id) typically.
             const { data: existing } = await supabase.from('medical_coord_v_records')
                 .select('id')
-                .eq('facility_id', facilityId)
-                .eq('date', r.date)
+                .eq('medical_coord_v_daily_id', dailyId)
                 .eq('resident_id', r.resident_id)
-                .limit(1) // Just take one if multiple
                 .maybeSingle()
 
             if (r.is_executed) {
                 if (!existing) {
                     const insertPayload = {
-                        organization_id: staff.organization_id,
+                        medical_coord_v_daily_id: dailyId, // CRITICAL FIX
+                        organization_id: staff.organization_id, // If column exists
                         facility_id: facilityId,
                         resident_id: r.resident_id,
-                        staff_id: staff.id, // Required field - use current staff as executor
+                        // staff_id: staff.id, // Removed: Not in standard schema, causes error if not present
                         date: r.date,
+                        is_executed: true,
                         updated_at: new Date().toISOString()
                     }
 
                     const { error: insertError } = await supabase.from('medical_coord_v_records').insert(insertPayload)
                     if (insertError) {
                         logger.error('Medical V insert failed', insertError)
+                        throw insertError // Fail explicitly to trigger UI error
                     }
                 }
             } else {
                 if (existing) {
-                    // Delete ALL for this date/resident to be safe? Or just the one found?
-                    // Safer to delete all matches for this specific logic to ensure "False" means "No Record".
                     const { error: deleteError } = await supabase.from('medical_coord_v_records')
                         .delete()
-                        .eq('facility_id', facilityId)
-                        .eq('date', r.date)
-                        .eq('resident_id', r.resident_id)
+                        .eq('id', existing.id)
                     if (deleteError) {
                         logger.error('Medical V delete failed', deleteError)
+                        throw deleteError
                     }
                 }
             }

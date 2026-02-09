@@ -3,13 +3,22 @@
 import { Button } from '@/components/ui/button'
 import { Edit } from 'lucide-react'
 import { deleteStaff } from '@/app/actions/staff'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { StaffFormDialog } from './staff-form-dialog'
 import { DeleteButton } from '@/components/common/delete-button'
 
 export function StaffActions({ staff, currentStaff }: { staff: any; currentStaff: any }) {
     const [loading, setLoading] = useState(false)
     const [editOpen, setEditOpen] = useState(false)
+    const [mounted, setMounted] = useState(false)
+
+    useEffect(() => {
+        setMounted(true)
+    }, [])
+
+    if (!mounted) {
+        return <div className="h-8 w-16" /> // Placeholder
+    }
 
     // Delete logic moved to DeleteButton
 

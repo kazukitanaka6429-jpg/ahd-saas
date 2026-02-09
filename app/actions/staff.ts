@@ -185,7 +185,13 @@ export async function generateInviteLink(staffId: string) {
             return { error: translateError(error.message) }
         }
 
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+        let baseUrl = process.env.NEXT_PUBLIC_APP_URL
+        if (!baseUrl && process.env.VERCEL_URL) {
+            baseUrl = `https://${process.env.VERCEL_URL}`
+        }
+        if (!baseUrl) {
+            baseUrl = 'http://localhost:3000'
+        }
         const inviteUrl = `${baseUrl}/join?token=${token}`
 
         revalidatePath('/staffs')
@@ -280,6 +286,35 @@ async function checkStaffRelatedData(supabase: any, staffId: string): Promise<{ 
         return {
             hasData: true,
             message: `${date.getMonth() + 1}月${date.getDate()}日にシフトの記録があるため削除できません。先に関連データを削除してください。`
+        }
+    }
+
+    // 2. 施設通知 (facility_notifications) - 作成者
+    const { count: notificationCount } = await supabase
+        .from('facility_notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('created_by', staffId)
+
+    if (notificationCount && notificationCount > 0) {
+        return {
+            hasData: true,
+            message: `この職員が作成した施設通知が${notificationCount}件存在するため削除できません。`
+        }
+    }
+
+    // 3. 操作ログ (operation_logs) - アクター
+    // Note: operation_logs usually shouldn't block deletion if we want to keep audit trails, 
+    // but if FK is strict, we must delete them or set null. 
+    // If strict FK exists, we must warn.
+    const { count: logCount } = await supabase
+        .from('operation_logs')
+        .select('*', { count: 'exact', head: true })
+        .eq('actor_id', staffId)
+
+    if (logCount && logCount > 0) {
+        return {
+            hasData: true,
+            message: `この職員の操作ログが${logCount}件存在するため削除できません。開発者にデータのクリーンアップを依頼してください。`
         }
     }
 
