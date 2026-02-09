@@ -14,6 +14,7 @@ function JoinContent() {
     const searchParams = useSearchParams()
     const router = useRouter()
     const token = searchParams.get('token') || ''
+    console.log('[JoinPage] Token from URL:', token)
 
     const [loading, setLoading] = useState(true)
     const [submitting, setSubmitting] = useState(false)
@@ -103,7 +104,10 @@ function JoinContent() {
                     <CardHeader className="text-center">
                         <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-2" />
                         <CardTitle className="text-red-600">無効なリンク</CardTitle>
-                        <CardDescription>{error}</CardDescription>
+                        <CardDescription>
+                            {error}<br />
+                            <span className="text-xs text-gray-400 mt-2 block">Token: {token?.slice(0, 8)}...</span>
+                        </CardDescription>
                     </CardHeader>
                     <CardContent className="text-center">
                         <p className="text-sm text-gray-500">

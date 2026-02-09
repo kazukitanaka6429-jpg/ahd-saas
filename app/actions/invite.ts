@@ -95,8 +95,11 @@ export async function generateInviteLink(staffId: string) {
  * @param token - 招待トークン
  */
 export async function validateInviteToken(token: string) {
-    if (!token) {
-        return { error: '無効なリンクです' }
+    const cleanToken = token?.trim()
+    console.log('[validateInviteToken] Validating token:', cleanToken)
+
+    if (!cleanToken) {
+        return { error: 'リンクにトークンが含まれていません (Code: EMPTY)' }
     }
 
     let supabaseAdmin;
@@ -104,18 +107,20 @@ export async function validateInviteToken(token: string) {
         supabaseAdmin = createAdminClient()
     } catch (e) {
         logger.error('Failed to create admin client:', e)
-        return { error: 'システムエラー: 環境変数設定を確認してください' }
+        return { error: 'システムエラー: 環境変数設定を確認してください (Code: ENV)' }
     }
 
     const { data: staff, error } = await supabaseAdmin
         .from('staffs')
         .select('id, name, facility_id, auth_user_id')
-        .eq('invite_token', token)
+        .eq('invite_token', cleanToken)
         .single()
 
     if (error || !staff) {
-        return { error: '無効または期限切れのリンクです' }
+        console.log('[validateInviteToken] Staff not found or error:', error)
+        return { error: '無効または期限切れのリンクです (Code: NOT_FOUND)' }
     }
+    console.log('[validateInviteToken] Staff found:', staff.id)
 
     if (staff.auth_user_id) {
         return { error: 'このリンクは既に使用されています' }
