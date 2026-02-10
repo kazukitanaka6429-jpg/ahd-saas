@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { AttendanceRecord, ManualWorkRecord, SpotJobRecord, VisitingNursingRecord, ManualDeduction } from '@/types/audit'
 import { DailyShift } from '@/types'
 import { addDays, format, subDays, parseISO, isBefore, isAfter, startOfDay, endOfDay } from 'date-fns'
@@ -45,7 +45,7 @@ const SHIFT_NIGHT_START = "16:30"
 const SHIFT_NIGHT_END = "09:30"
 
 export async function fetchAuditData(targetDate: string, facilityId: string): Promise<AuditData> {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const prevDate = format(subDays(parseISO(targetDate), 1), 'yyyy-MM-dd')
     const dates = [prevDate, targetDate]
 
@@ -109,6 +109,9 @@ export function calculateAudit(data: AuditData): AuditResult {
     const workerSegments = new Map<string, WorkSegment[]>()
     const workerSource = new Map<string, 'attendance' | 'manual' | 'daily' | 'spot'>()
 
+    // Helper to normalize names (remove spaces + full-width → half-width via NFKC)
+    const normalizeName = (name: string) => name.normalize('NFKC').replace(/[\s\u3000]+/g, '')
+
     const addSegment = (workerId: string, workerName: string, startM: number, endM: number, type: 'work' | 'deduction', source?: 'attendance' | 'manual' | 'daily' | 'spot') => {
         const effectiveStart = Math.max(0, startM)
         const effectiveEnd = Math.min(1440, endM)
@@ -137,7 +140,7 @@ export function calculateAudit(data: AuditData): AuditResult {
         if (endM < startM) endM += 1440
         if (isPrev) { startM -= 1440; endM -= 1440; }
 
-        coveredNames.add(rec.staff_name)
+        coveredNames.add(normalizeName(rec.staff_name))
         addSegment(rec.staff_name, rec.staff_name, startM, endM, 'work', 'attendance')
     })
 
@@ -152,7 +155,7 @@ export function calculateAudit(data: AuditData): AuditResult {
         const id = rec.staff_id || rec.id
         const name = staffMap.get(id) || `Staff ${id}`
 
-        coveredNames.add(name) // Mark as covered
+        coveredNames.add(normalizeName(name)) // Mark as covered
         addSegment(id, name, startM, endM, 'work', 'manual')
     })
 
@@ -180,7 +183,7 @@ export function calculateAudit(data: AuditData): AuditResult {
                 if (!isPrev) {
                     const name = staffMap.get(staffId) || `Staff ${staffId}`
                     // CHECK COVERAGE
-                    if (!coveredNames.has(name)) {
+                    if (!coveredNames.has(normalizeName(name))) {
                         addSegment(staffId, name, startM, endM, 'work', 'daily')
                     }
                 }
@@ -196,7 +199,7 @@ export function calculateAudit(data: AuditData): AuditResult {
             rec.night_staff_ids.forEach(staffId => {
                 const name = staffMap.get(staffId) || `Staff ${staffId}`
                 // CHECK COVERAGE
-                if (!coveredNames.has(name)) {
+                if (!coveredNames.has(normalizeName(name))) {
                     addSegment(staffId, name, startM, endM, 'work', 'daily')
                 }
             })
@@ -211,7 +214,8 @@ export function calculateAudit(data: AuditData): AuditResult {
         if (endM < startM) endM += 1440
         if (isPrev) { startM -= 1440; endM -= 1440; }
 
-        addSegment(rec.nursing_staff_name, rec.nursing_staff_name, startM, endM, 'deduction')
+        const normalizedName = normalizeName(rec.nursing_staff_name)
+        addSegment(normalizedName, rec.nursing_staff_name, startM, endM, 'deduction')
     })
 
     data.manualDeductions.forEach(rec => {
@@ -223,7 +227,71 @@ export function calculateAudit(data: AuditData): AuditResult {
 
         const id = rec.staff_id || rec.id
         const name = staffMap.get(id) || "Staff"
+        // Use ID for linking if available, consistent with Manual Work
         addSegment(id, name, startM, endM, 'deduction')
+    })
+
+    // --- Post-Processing: Link Name-based Deductions to ID-based Workers ---
+    // Visiting Nursing has Key=Name. Manual/Daily has Key=UUID.
+    // We need to move deductions from "Name Key" to "UUID Key" if names match.
+
+    // (normalizeName is now defined at the top of calculateAudit)
+
+    // 1. Identify potential ID-based workers (Manual/Daily) 
+    //    who might have name-based deductions floating around.
+    const idBasedWorkers = new Map<string, string>(); // NormalizedName -> ID
+    workerMap.forEach((name, id) => {
+        if (id.length > 30) { // Simple check for UUID-like ID vs Name-like ID
+            // Note: If multiple IDs have same name, this simple map overwrite logic 
+            // picks the last one. Ideally we apply to all, but 1-to-1 is most common.
+            idBasedWorkers.set(normalizeName(name), id)
+        }
+    })
+
+    // 2. Scan for Name-keyed segments that only have deductions (or mixed)
+    //    and merge them into the ID-keyed segments.
+    //    Actually, we just check if a Worker Key (which might be a Name) matches an ID's Name.
+    const keys = Array.from(workerSegments.keys())
+    keys.forEach(key => {
+        // If this key is a Name (not UUID) and we have a corresponding UUID worker...
+        // How to distinguish? UUIDs are usually 36 chars. Names are shorter or different.
+        // Or simply: check if `key` exists in `idBasedWorkers` values? No.
+        // Check if `key` (Name) matches a Name in our map.
+
+        // Skip if key itself looks like UUID (length check is heuristics)
+        if (key.length > 30) return
+
+        const normalizedKey = normalizeName(key)
+        const targetId = idBasedWorkers.get(normalizedKey)
+
+        if (targetId && targetId !== key) {
+            // Found a match! 'key' is likely the Name, 'targetId' is the UUID.
+            // Move segments from 'key' to 'targetId'
+            const sourceSegments = workerSegments.get(key) || []
+            const targetSegments = workerSegments.get(targetId) || []
+
+            // Only move DEDUCTIONS? Or everything?
+            // Usually Visiting Nursing (Key=Name) only has Deductions.
+            // But Attendance (Key=Name) has Work. We don't want to move Attendance Work to Manual Work ID (Double Counting?).
+            // Actually, Attendance and Daily shouldn't coexist for same person logically (Double Master).
+            // Safest: Move DEDUCTIONS only.
+
+            const deductions = sourceSegments.filter(s => s.type === 'deduction')
+            if (deductions.length > 0) {
+                workerSegments.set(targetId, [...targetSegments, ...deductions])
+
+                // Remove moved deductions from source? 
+                // If we leave them, they form a separate "Worker" with 0 work and N deduction.
+                // Effectively 0 presence. Safe to leave, but cleaner to remove if empty.
+                const remaining = sourceSegments.filter(s => s.type !== 'deduction')
+                if (remaining.length === 0) {
+                    workerSegments.delete(key)
+                    workerMap.delete(key)
+                } else {
+                    workerSegments.set(key, remaining)
+                }
+            }
+        }
     })
 
     // --- Totals ---

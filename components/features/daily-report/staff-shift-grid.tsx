@@ -26,6 +26,15 @@ export function StaffShiftGrid({ staffs, initialData, date, facilityId }: StaffS
         night_shift_plus: false
     })
 
+    // Reset state when initialData or date changes
+    useEffect(() => {
+        setShiftData(initialData || {
+            day_staff_ids: [],
+            night_staff_ids: [],
+            night_shift_plus: false
+        })
+    }, [initialData, date])
+
     // Publish night staff count AND night_shift_plus to shared state for validation
     useEffect(() => {
         const nightStaffCount = (shiftData.night_staff_ids || []).filter(id => id && id !== '').length

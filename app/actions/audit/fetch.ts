@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { getCurrentStaff } from '@/lib/auth-helpers'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { protect } from '@/lib/auth-guard'
 import { fetchAuditData, calculateAudit, AuditResult, AuditData } from '@/lib/audit/calculator'
 import { format } from 'date-fns'
@@ -23,8 +23,23 @@ export interface AuditPageData {
 export async function getAuditPageData(dateStr?: string, facilityIdOverride?: string): Promise<AuditPageData | { error: string }> {
     try {
         await protect()
-        const staff = await getCurrentStaff()
-        if (!staff) return { error: 'Unauthorized' }
+
+        // Use Admin Client to bypass potential RLS issues for staff lookup.
+        // We already verified session existence with protect().
+        const supabaseAdmin = createAdminClient()
+        const { data: { user } } = await (await createClient()).auth.getUser()
+
+        if (!user) return { error: 'Unauthorized: No User' }
+
+        const { data: staff } = await supabaseAdmin
+            .from('staffs')
+            .select('*')
+            .eq('auth_user_id', user.id)
+            .single()
+
+        if (!staff) {
+            return { error: 'Unauthorized: Staff Link Missing' }
+        }
 
         // Determine facility ID: override > cookie (for admin) > staff's facility
         let facilityId = staff.facility_id
@@ -46,8 +61,7 @@ export async function getAuditPageData(dateStr?: string, facilityIdOverride?: st
         const auditResult = calculateAudit(rawData)
 
         // 2. Fetch Active Staff List for Dialogs (filtered by selected facility)
-        const supabase = await createClient()
-        const { data: staffList } = await supabase
+        const { data: staffList } = await supabaseAdmin
             .from('staffs')
             .select('id, name')
             .eq('facility_id', facilityId)

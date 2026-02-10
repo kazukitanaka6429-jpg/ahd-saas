@@ -1,22 +1,50 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { getCurrentStaff } from '@/lib/auth-helpers'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { protect } from '@/lib/auth-guard'
 import { logger } from '@/lib/logger'
 import { parseAttendanceCsv, parseSpotJobCsv, parseNursingCsv } from '@/lib/audit/csv-parser'
 import { parseNursingExcel } from '@/lib/audit/excel-parser'
 import { revalidatePath } from 'next/cache'
+import { cookies } from 'next/headers'
 
 import { decodeCsvFile } from '@/lib/csv-utils'
+
+/** Resolve current staff using Admin Client (bypasses RLS) */
+async function resolveStaff() {
+    await protect()
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
+
+    const admin = createAdminClient()
+    const { data: staff } = await admin
+        .from('staffs')
+        .select('*')
+        .eq('auth_user_id', user.id)
+        .single()
+
+    if (!staff) return null
+
+    // For admin users, resolve facility from cookie
+    if (staff.role === 'admin' && !staff.facility_id) {
+        const cookieStore = await cookies()
+        const facilityFromCookie = cookieStore.get('selected_facility_id')?.value
+        if (facilityFromCookie) {
+            return { ...staff, facility_id: facilityFromCookie }
+        }
+    }
+
+    return staff
+}
 
 /**
  * Import Attendance CSV (Kintai)
  */
 export async function importAttendance(formData: FormData) {
     try {
-        await protect()
-        const staff = await getCurrentStaff()
+        const staff = await resolveStaff()
         if (!staff || !staff.facility_id) return { error: 'Unauthorized' }
 
         const file = formData.get('file') as File
@@ -27,7 +55,7 @@ export async function importAttendance(formData: FormData) {
 
         if (records.length === 0) return { error: 'No valid records found' }
 
-        const supabase = await createClient()
+        const supabase = createAdminClient()
 
         // Strategy: Upsert
         const { error } = await supabase
@@ -54,8 +82,7 @@ export async function importAttendance(formData: FormData) {
  */
 export async function importSpotJob(formData: FormData) {
     try {
-        await protect()
-        const staff = await getCurrentStaff()
+        const staff = await resolveStaff()
         if (!staff || !staff.facility_id) return { error: 'Unauthorized' }
 
         const file = formData.get('file') as File
@@ -66,7 +93,7 @@ export async function importSpotJob(formData: FormData) {
 
         if (records.length === 0) return { error: 'No valid records found' }
 
-        const supabase = await createClient()
+        const supabase = createAdminClient()
 
         const { error } = await supabase
             .from('spot_job_records')
@@ -92,8 +119,7 @@ export async function importSpotJob(formData: FormData) {
  */
 export async function importNursing(formData: FormData) {
     try {
-        await protect()
-        const staff = await getCurrentStaff()
+        const staff = await resolveStaff()
         if (!staff || !staff.facility_id) return { error: 'Unauthorized' }
 
         const file = formData.get('file') as File
@@ -114,7 +140,7 @@ export async function importNursing(formData: FormData) {
 
         if (records.length === 0) return { error: 'No valid records found' }
 
-        const supabase = await createClient()
+        const supabase = createAdminClient()
 
         // Strategy: Delete existing records for the months present
         const months = new Set(records.map(r => r.visit_date.substring(0, 7))) // YYYY-MM

@@ -62,8 +62,17 @@ export function parseNursingCsv(content: string, facilityId: string): Omit<Visit
         trim: true
     }) as RawCsvRow[]
 
+    if (records.length > 0) {
+        console.log(`Debug: CSV Headers: ${Object.keys(records[0]).join(', ')}`)
+    }
+
     return records.map(row => {
         const visitDate = row['訪問日']?.replace(/\//g, '-')
+
+        if (!visitDate || !row['主訪問者']) {
+            // Log only first few failures to avoid spam
+            // console.log("Debug: Row skipped", JSON.stringify(row))
+        }
 
         return {
             facility_id: facilityId,
