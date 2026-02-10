@@ -44,7 +44,7 @@ export async function getMonthlyResidentRecords(
         const { data: resident, error: resError } = await supabase
             .from('residents')
             .select(`
-                id, name, date_of_birth, facility_id,
+                id, name, facility_id,
                 facilities ( name, organization_id )
             `)
             .eq('id', residentId)
@@ -108,7 +108,7 @@ export async function getMonthlyResidentRecords(
                 resident: {
                     id: resident.id,
                     name: resident.name,
-                    date_of_birth: resident.date_of_birth
+                    date_of_birth: null
                 },
                 facility: {
                     // @ts-ignore
