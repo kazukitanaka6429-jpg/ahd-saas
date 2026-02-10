@@ -117,7 +117,8 @@ export function StaffFormDialog({ currentStaff, initialData, trigger, open: cont
         const formData = new FormData(e.currentTarget)
         const name = formData.get('name') as string
         const role = formData.get('role') as 'admin' | 'manager' | 'staff'
-        const facilityId = formData.get('facility_id') as string || null
+        const rawFacilityId = formData.get('facility_id') as string
+        const facilityId = rawFacilityId === 'hq' ? null : rawFacilityId
 
         // Qualification ID logic handled by state 'qualificationId'
         // Job Types handled by state 'selectedJobTypes'
@@ -180,11 +181,12 @@ export function StaffFormDialog({ currentStaff, initialData, trigger, open: cont
                         {showFacilitySelect && (
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="facility_id" className="text-right">施設</Label>
-                                <Select name="facility_id" defaultValue={initialData?.facility_id || currentStaff?.facility_id}>
+                                <Select name="facility_id" defaultValue={initialData?.facility_id ?? (currentStaff?.facility_id ?? "hq")}>
                                     <SelectTrigger className="col-span-3">
                                         <SelectValue placeholder="施設を選択" />
                                     </SelectTrigger>
                                     <SelectContent>
+                                        <SelectItem value="hq">本社 (施設所属なし)</SelectItem>
                                         {facilities.map(f => (
                                             <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
                                         ))}

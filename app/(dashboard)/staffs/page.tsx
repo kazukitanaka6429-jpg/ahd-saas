@@ -122,7 +122,13 @@ export default async function StaffsPage() {
                             {staffs?.map((s: any) => (
                                 <TableRow key={s.id}>
                                     <TableCell className="font-medium sticky left-0 bg-white z-10">{s.name}</TableCell>
-                                    <TableCell>{(s as StaffWithRelations).facilities?.name || '-'}</TableCell>
+                                    <TableCell>
+                                        {!s.facility_id ? (
+                                            <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-200">本社</Badge>
+                                        ) : (
+                                            (s as StaffWithRelations).facilities?.name || '-'
+                                        )}
+                                    </TableCell>
                                     <TableCell>{getRoleLabel(s.role)}</TableCell>
                                     <TableCell>{getStatusLabel(s.status)}</TableCell>
                                     <TableCell>

@@ -56,7 +56,7 @@ export function FacilityProvider({
                         .from('facilities')
                         .select('*')
                         .eq('organization_id', initialStaff.organization_id)
-                        .order('name')
+                        .order('id')
 
                     if (error) throw error
                     facilities = (data || []) as Facility[]

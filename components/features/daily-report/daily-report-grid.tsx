@@ -334,7 +334,10 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
     const checkboxClass = "w-5 h-5 accent-green-600 cursor-pointer"
 
     // Unit Filtering State
-    const [selectedUnitId, setSelectedUnitId] = useState<string>('all')
+    const [selectedUnitId, setSelectedUnitId] = useState<string>(() => {
+        if (units && units.length > 0) return units[0].id
+        return 'all'
+    })
 
     const filteredResidents = residents.filter(r => {
         if (units.length === 0) return true

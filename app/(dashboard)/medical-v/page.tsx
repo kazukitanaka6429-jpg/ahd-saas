@@ -44,7 +44,7 @@ export default async function MedicalVPage({
 
     const [data, unitsRes] = await Promise.all([
         getMedicalVData(year, month, facilityId || undefined),
-        getUnits()
+        getUnits(facilityId || undefined)
     ])
     const { residents, rows, targetCount } = data
 

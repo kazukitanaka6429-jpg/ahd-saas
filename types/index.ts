@@ -97,6 +97,7 @@ export interface FeedbackComment {
     content: string
     is_resolved: boolean
     created_at: string
+    created_by?: string
 }
 
 // Validation Types

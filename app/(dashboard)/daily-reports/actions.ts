@@ -160,12 +160,83 @@ export async function postFeedback(formData: FormData) {
             facility_id: facilityId,
             report_date: date,
             content,
-            author_name: authorName
+            author_name: authorName,
+            created_by: staff.id
         })
 
         revalidatePath('/daily-reports')
     } catch (e) {
         logger.error('Unexpected error in postFeedback', e)
+    }
+}
+
+export async function updateFeedback(id: string, content: string) {
+    try {
+        await protect()
+        const staff = await getCurrentStaff()
+        if (!staff) return { error: 'Unauthorized' }
+
+        const supabase = await createClient()
+
+        // Verify ownership
+        const { data: comment } = await supabase
+            .from('feedback_comments')
+            .select('created_by')
+            .eq('id', id)
+            .single()
+
+        if (!comment) return { error: 'Comment not found' }
+
+        // Allow if author matches
+        if (comment.created_by !== staff.id) {
+            return { error: '編集権限がありません' }
+        }
+
+        const { error } = await supabase
+            .from('feedback_comments')
+            .update({ content, updated_at: new Date().toISOString() })
+            .eq('id', id)
+
+        if (error) throw error
+
+        revalidatePath('/daily-reports')
+        return { success: true }
+    } catch (e) {
+        logger.error('Unexpected error in updateFeedback', e)
+        return { error: '更新に失敗しました' }
+    }
+}
+
+export async function deleteFeedback(id: string) {
+    try {
+        await protect()
+        const staff = await getCurrentStaff()
+        // Allow Admin or Original Author? User asked: "Admin can delete". 
+        // Also "General/Manager can edit own".
+        // Let's allow Admin to delete ANY. 
+        // And maybe Author to delete own? implementation_plan said Admin.
+        // Let's stick to: Admin can delete.
+
+        if (!staff) return { error: 'Unauthorized' }
+
+        const supabase = await createClient()
+
+        if (staff.role !== 'admin') {
+            return { error: '削除権限がありません' }
+        }
+
+        const { error } = await supabase
+            .from('feedback_comments')
+            .delete()
+            .eq('id', id)
+
+        if (error) throw error
+
+        revalidatePath('/daily-reports')
+        return { success: true }
+    } catch (e) {
+        logger.error('Unexpected error in deleteFeedback', e)
+        return { error: '削除に失敗しました' }
     }
 }
 

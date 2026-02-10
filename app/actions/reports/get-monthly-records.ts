@@ -35,6 +35,7 @@ export async function getMonthlyResidentRecords(
         const staff = await getCurrentStaff()
         if (!staff) return { error: 'Unauthorized' }
 
+        // Use authenticated client (RLS will be handled by DB policy)
         const supabase = await createClient()
 
         // 1. Fetch Resident & Verify Access
@@ -64,13 +65,18 @@ export async function getMonthlyResidentRecords(
         }
 
         // Access Check
-        // If staff is not admin, must belong to same facility
-        if (staff.role !== 'admin' && staff.facility_id !== resident.facility_id) {
+        // 1. Organization Check (Strict)
+        // @ts-ignore: joined table type inference
+        if (resident.facilities?.organization_id !== staff.organization_id) {
             return { error: '権限がありません' }
         }
-        // If staff is admin, must belong to same organization
-        // @ts-ignore: joined table type inference
-        if (staff.role === 'admin' && resident.facilities?.organization_id !== staff.organization_id) {
+
+        // 2. Facility Scope Check
+        // - Admin: All access within Org
+        // - HQ Staff (null facility): All access within Org (assuming HQ has oversight)
+        // - Facility Staff/Manager: Must match facility_id
+        const isHqStaff = !staff.facility_id
+        if (staff.role !== 'admin' && !isHqStaff && staff.facility_id !== resident.facility_id) {
             return { error: '権限がありません' }
         }
 

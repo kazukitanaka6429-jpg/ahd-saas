@@ -120,7 +120,12 @@ export default async function DailyReportsPage({
                 <div className="mt-8 pt-8 border-t">
                     <h3 className="text-sm font-bold text-gray-500 mb-4">全体フィードバック・連絡事項</h3>
                     <React.Suspense fallback={<div className="h-20 bg-gray-50 animate-pulse rounded" />}>
-                        <FeedbackSectionWrapper date={today} facilityId={facilityId} />
+                        <FeedbackSectionWrapper
+                            date={today}
+                            facilityId={facilityId}
+                            currentStaffId={staff.id}
+                            currentUserRole={staff.role}
+                        />
                     </React.Suspense>
                 </div>
             </div>
@@ -129,7 +134,7 @@ export default async function DailyReportsPage({
 }
 
 // Small inline wrapper for feedback to avoid another file if possible, or usually separate file
-async function FeedbackSectionWrapper({ date, facilityId }: { date: string, facilityId: string }) {
+async function FeedbackSectionWrapper({ date, facilityId, currentStaffId, currentUserRole }: { date: string, facilityId: string, currentStaffId: string, currentUserRole: string }) {
     const supabase = await createClient()
     const { data: comments } = await supabase
         .from('feedback_comments')
@@ -138,6 +143,11 @@ async function FeedbackSectionWrapper({ date, facilityId }: { date: string, faci
         .eq('report_date', date)
         .order('created_at', { ascending: true })
 
-    return <FeedbackSection comments={comments || []} date={date} />
+    return <FeedbackSection
+        comments={comments || []}
+        date={date}
+        currentStaffId={currentStaffId}
+        currentUserRole={currentUserRole}
+    />
 }
 

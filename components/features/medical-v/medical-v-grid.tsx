@@ -48,7 +48,10 @@ export function MedicalVGrid({ residents = [], rows: initialRows = [], targetCou
     const [isSaving, setIsSaving] = useState(false)
 
     // Unit Filtering State
-    const [selectedUnitId, setSelectedUnitId] = useState<string>('all')
+    const [selectedUnitId, setSelectedUnitId] = useState<string>(() => {
+        if (units && units.length > 0) return units[0].id
+        return 'all'
+    })
 
     // Filter Residents based on Unit
     const filteredResidents = useMemo(() => residents.filter(r => {
