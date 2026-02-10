@@ -8,8 +8,7 @@ import { MonthlyReportData, DailyRecordForReport } from '@/app/actions/reports/g
 Font.register({
     family: 'NotoSansJP',
     fonts: [
-        { src: 'https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/NotoSansJP-Regular.ttf' },
-        { src: 'https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/NotoSansJP-Bold.ttf', fontWeight: 'bold' }
+        { src: '/fonts/ipaexg.ttf' },
     ]
 });
 

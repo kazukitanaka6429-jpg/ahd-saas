@@ -47,7 +47,7 @@ export function MonthlyReportDownloadButton({ residentId, year, month, disabled 
             toast.success('ダウンロード完了')
         } catch (e) {
             console.error(e)
-            toast.error('PDF作成中にエラーが発生しました')
+            toast.error(`PDF作成中にエラー: ${e instanceof Error ? e.message : 'Unknown error'}`)
         } finally {
             setLoading(false)
         }
