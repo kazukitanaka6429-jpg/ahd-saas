@@ -39,6 +39,8 @@ export async function getMonthlyResidentRecords(
         const supabase = await createClient()
 
         // 1. Fetch Resident & Verify Access
+        console.log(`[MonthlyReport] Fetching resident ${residentId} for user ${staff.id} (Role: ${staff.role}, Facility: ${staff.facility_id})`)
+
         const { data: resident, error: resError } = await supabase
             .from('residents')
             .select(`
@@ -49,19 +51,13 @@ export async function getMonthlyResidentRecords(
             .single()
 
         if (resError) {
-            logger.error('getMonthlyResidentRecords: resident query error', {
-                residentId,
-                error: resError,
-                staffId: staff.id,
-                staffRole: staff.role,
-                staffFacilityId: staff.facility_id
-            })
-            return { error: '利用者が見つかりません (DBエラー)' }
+            console.error('[MonthlyReport] Resident fetch error:', resError)
+            return { error: `利用者が見つかりません (DB Error: ${resError.code} - ${resError.message})` }
         }
 
         if (!resident) {
-            logger.warn('getMonthlyResidentRecords: resident not found', { residentId })
-            return { error: '利用者が見つかりません' }
+            console.error('[MonthlyReport] Resident is null')
+            return { error: '利用者が見つかりません (Data is null)' }
         }
 
         // Access Check
