@@ -61,6 +61,7 @@ export default async function PersonnelAuditPage({ searchParams }: { searchParam
                             targetDate={date}
                             staffList={staffList}
                             manualDeductions={manualDeductions}
+                            dailyShifts={dailyShifts}
                         />
                     </div>
                 </div>

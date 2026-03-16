@@ -25,6 +25,7 @@ export interface GetOperationLogsParams {
     actionType?: string
     limit?: number
     offset?: number
+    includeArchive?: boolean
 }
 
 export interface GetOperationLogsResult {
@@ -59,6 +60,11 @@ export async function getOperationLogs(params: GetOperationLogsParams = {}): Pro
         // Apply filters
         if (params.startDate) {
             query = query.gte('created_at', `${params.startDate}T00:00:00`)
+        } else if (!params.includeArchive) {
+            // Default: show only last 1 year unless archive is explicitly requested
+            const oneYearAgo = new Date()
+            oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
+            query = query.gte('created_at', oneYearAgo.toISOString())
         }
         if (params.endDate) {
             query = query.lte('created_at', `${params.endDate}T23:59:59`)
@@ -153,4 +159,63 @@ export async function exportLogsToCSV(params: GetOperationLogsParams): Promise<s
     ].join('\n')
 
     return csvContent
+}
+
+export interface AuditStats {
+    todayTotal: number
+    todayDeletes: number
+    nightOps: number
+}
+
+/**
+ * Get anomaly detection statistics for the audit dashboard.
+ */
+export async function getAuditStats(): Promise<AuditStats> {
+    try {
+        const staff = await getCurrentStaff()
+        if (!staff || staff.role !== 'admin') {
+            return { todayTotal: 0, todayDeletes: 0, nightOps: 0 }
+        }
+
+        const supabase = await createClient()
+        const today = new Date()
+        const todayStr = today.toISOString().split('T')[0]
+
+        // Today's total operations
+        const { count: todayTotal } = await supabase
+            .from('operation_logs')
+            .select('*', { count: 'exact', head: true })
+            .eq('organization_id', staff.organization_id)
+            .gte('created_at', `${todayStr}T00:00:00`)
+
+        // Today's DELETE operations
+        const { count: todayDeletes } = await supabase
+            .from('operation_logs')
+            .select('*', { count: 'exact', head: true })
+            .eq('organization_id', staff.organization_id)
+            .eq('action_type', 'DELETE')
+            .gte('created_at', `${todayStr}T00:00:00`)
+
+        // Night operations (22:00 - 06:00) in last 24 hours
+        const yesterday = new Date(today)
+        yesterday.setDate(yesterday.getDate() - 1)
+        const { data: recentLogs } = await supabase
+            .from('operation_logs')
+            .select('created_at')
+            .eq('organization_id', staff.organization_id)
+            .gte('created_at', yesterday.toISOString())
+
+        const nightOps = (recentLogs || []).filter(log => {
+            const hour = new Date(log.created_at).getHours()
+            return hour >= 22 || hour < 6
+        }).length
+
+        return {
+            todayTotal: todayTotal || 0,
+            todayDeletes: todayDeletes || 0,
+            nightOps
+        }
+    } catch {
+        return { todayTotal: 0, todayDeletes: 0, nightOps: 0 }
+    }
 }

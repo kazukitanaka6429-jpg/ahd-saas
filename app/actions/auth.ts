@@ -1,12 +1,13 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { Staff } from '@/types'
 import { protect } from '@/lib/auth-guard'
 import { logger } from '@/lib/logger'
 import { translateError } from '@/lib/error-translator'
+import { logOperation } from '@/lib/operation-logger'
 
 import { getCurrentStaff as getCurrentStaffHelper, getMyStaffIdentities } from '@/lib/auth-helpers'
 
@@ -69,12 +70,76 @@ export async function switchFacility(staffId: string) {
 
 export async function signOut() {
     const supabase = await createClient()
+
+    // Log logout before signing out (we need user info)
+    try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+            const { data: staff } = await supabase
+                .from('staffs')
+                .select('id, organization_id, name')
+                .eq('auth_user_id', user.id)
+                .limit(1)
+                .single()
+
+            if (staff) {
+                logOperation({
+                    organizationId: staff.organization_id,
+                    actorId: staff.id,
+                    targetResource: 'auth',
+                    actionType: 'LOGOUT',
+                    details: { staffName: staff.name, email: user.email }
+                })
+            }
+        }
+    } catch (e) {
+        logger.error('Failed to log logout operation', e)
+    }
+
     await supabase.auth.signOut()
 
     const cookieStore = await cookies()
     cookieStore.delete('active_staff_id')
 
     redirect('/login')
+}
+
+/**
+ * Records a login event. Called from client-side after successful signInWithPassword.
+ */
+export async function recordLogin() {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        const { data: staff } = await supabase
+            .from('staffs')
+            .select('id, organization_id, name')
+            .eq('auth_user_id', user.id)
+            .limit(1)
+            .single()
+
+        if (staff) {
+            const headersList = await headers()
+            const ip = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || null
+
+            logOperation({
+                organizationId: staff.organization_id,
+                actorId: staff.id,
+                targetResource: 'auth',
+                actionType: 'LOGIN',
+                details: {
+                    staffName: staff.name,
+                    email: user.email,
+                    userAgent: headersList.get('user-agent') || undefined,
+                    ipAddress: ip
+                }
+            })
+        }
+    } catch (e) {
+        logger.error('Failed to record login', e)
+    }
 }
 
 export async function getStaffIdentities() {

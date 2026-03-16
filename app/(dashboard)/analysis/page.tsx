@@ -1,14 +1,15 @@
 import { Suspense } from 'react'
 import { OperationLogsClient } from './client'
-import { getOperationLogs, getStaffsForFilter } from '@/app/actions/admin/get-operation-logs'
+import { getOperationLogs, getStaffsForFilter, getAuditStats } from '@/app/actions/admin/get-operation-logs'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AnalysisPage() {
     // Initial data fetch
-    const [logsResult, staffs] = await Promise.all([
+    const [logsResult, staffs, auditStats] = await Promise.all([
         getOperationLogs({ limit: 50, offset: 0 }),
-        getStaffsForFilter()
+        getStaffsForFilter(),
+        getAuditStats()
     ])
 
     return (
@@ -25,6 +26,7 @@ export default async function AnalysisPage() {
                     initialLogs={logsResult.logs}
                     initialTotal={logsResult.total}
                     staffs={staffs}
+                    initialStats={auditStats}
                 />
             </Suspense>
         </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition, useEffect } from "react"
+import { useState, useTransition, useEffect, useCallback } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,6 +11,7 @@ import { Plus, Coffee, Stethoscope, Trash2 } from "lucide-react"
 import { upsertManualDeduction, deleteManualDeduction } from "@/app/actions/audit/manual"
 import { toast } from "sonner"
 import { ManualDeduction } from "@/types/audit"
+import { DailyShift } from "@/types"
 import { addMinutes, format, parse } from "date-fns"
 
 interface DeductionRow {
@@ -27,12 +28,76 @@ interface Props {
     targetDate: string
     staffList: { id: string, name: string }[]
     manualDeductions?: ManualDeduction[]
+    dailyShifts?: DailyShift[]
 }
 
-export function ManualDeductionDialog({ targetDate, staffList, manualDeductions = [] }: Props) {
+export function ManualDeductionDialog({ targetDate, staffList, manualDeductions = [], dailyShifts = [] }: Props) {
     const [open, setOpen] = useState(false)
     const [isPending, startTransition] = useTransition()
     const [rows, setRows] = useState<DeductionRow[]>([])
+
+    // Load staff from daily shifts (same pattern as ManualWorkDialog)
+    const loadFromDailyShifts = useCallback(() => {
+        const newRows: DeductionRow[] = []
+        let tempId = 0
+
+        if (dailyShifts && dailyShifts.length > 0) {
+            dailyShifts.forEach(shift => {
+                // Day Staff
+                shift.day_staff_ids?.forEach(sid => {
+                    newRows.push({
+                        id: tempId++,
+                        staffId: sid,
+                        reason: "休憩",
+                        startTime: "",
+                        endTime: "",
+                        selected: false,
+                        isNew: true
+                    })
+                })
+                // Night Staff
+                shift.night_staff_ids?.forEach(sid => {
+                    newRows.push({
+                        id: tempId++,
+                        staffId: sid,
+                        reason: "休憩",
+                        startTime: "",
+                        endTime: "",
+                        selected: false,
+                        isNew: true
+                    })
+                })
+            })
+        }
+
+        // Ensure at least 3 empty rows
+        const needed = 3 - newRows.length
+        if (needed > 0) {
+            for (let i = 0; i < needed; i++) {
+                newRows.push({
+                    id: tempId++,
+                    staffId: "",
+                    reason: "休憩",
+                    startTime: "",
+                    endTime: "",
+                    selected: false,
+                    isNew: true
+                })
+            }
+        } else {
+            newRows.push({
+                id: tempId++,
+                staffId: "",
+                reason: "休憩",
+                startTime: "",
+                endTime: "",
+                selected: false,
+                isNew: true
+            })
+        }
+
+        setRows(newRows)
+    }, [dailyShifts])
 
     // Initialize
     useEffect(() => {
@@ -60,23 +125,10 @@ export function ManualDeductionDialog({ targetDate, staffList, manualDeductions 
                 })
                 setRows(loaded)
             } else {
-                // Initialize with some blank rows
-                const blanks = []
-                for (let i = 0; i < 3; i++) {
-                    blanks.push({
-                        id: i,
-                        staffId: "",
-                        reason: "休憩",
-                        startTime: "",
-                        endTime: "",
-                        selected: false,
-                        isNew: true
-                    })
-                }
-                setRows(blanks)
+                loadFromDailyShifts()
             }
         }
-    }, [open, manualDeductions])
+    }, [open, manualDeductions, loadFromDailyShifts])
 
     const toggleSelectAll = (checked: boolean) => {
         setRows(rows.map(r => ({ ...r, selected: checked })))

@@ -13,6 +13,12 @@ export type TargetResource =
     | 'staff'
     | 'facility'
     | 'short_stay'
+    | 'manual_record'
+    | 'manual_deduction'
+    | 'resident_document'
+    | 'auth'
+    | 'page_view'
+    | 'notification'
 
 interface LogOperationParams {
     organizationId: string

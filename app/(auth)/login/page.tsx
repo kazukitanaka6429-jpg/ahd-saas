@@ -17,6 +17,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { recordLogin } from '@/app/actions/auth'
 
 export default function LoginPage() {
     const [email, setEmail] = useState('')
@@ -40,6 +41,8 @@ export default function LoginPage() {
             if (error) {
                 setError(error.message)
             } else {
+                // Record login event (fire-and-forget)
+                recordLogin().catch(() => {})
                 router.push('/')
                 router.refresh()
             }

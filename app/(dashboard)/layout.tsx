@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { StaffWithFacility } from '@/types'
 import { AutoLogoutProvider } from '@/components/providers/auto-logout-provider'
+import { PageViewTracker } from '@/components/providers/page-view-tracker'
 
 import { Header } from '@/components/layout/header'
 
@@ -71,6 +72,7 @@ export default async function DashboardLayout({
     return (
         <FacilityProvider initialStaff={initialStaff as StaffWithFacility} initialFacilityId={selectedFacilityId}>
             <AutoLogoutProvider>
+                <PageViewTracker />
                 <div className="flex h-screen w-full flex-col overflow-hidden bg-background print:h-auto print:overflow-visible">
                     <div className="print:hidden">
                         <Header

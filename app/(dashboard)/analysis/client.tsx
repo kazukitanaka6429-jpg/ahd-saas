@@ -32,6 +32,7 @@ import { Badge } from '@/components/ui/badge'
 import { Download, Search, Eye, ChevronLeft, ChevronRight } from 'lucide-react'
 import {
     OperationLog,
+    AuditStats,
     getOperationLogs,
     exportLogsToCSV,
 } from '@/app/actions/admin/get-operation-logs'
@@ -41,6 +42,7 @@ interface OperationLogsClientProps {
     initialLogs: OperationLog[]
     initialTotal: number
     staffs: { id: string; name: string }[]
+    initialStats?: AuditStats
 }
 
 const RESOURCE_OPTIONS = [
@@ -51,6 +53,9 @@ const RESOURCE_OPTIONS = [
     { value: 'staff', label: '職員' },
     { value: 'facility', label: '施設' },
     { value: 'short_stay', label: 'ショートステイ' },
+    { value: 'auth', label: '認証（ログイン/アウト）' },
+    { value: 'page_view', label: 'ページ閲覧' },
+    { value: 'notification', label: '通知' },
 ]
 
 const ACTION_OPTIONS = [
@@ -58,6 +63,9 @@ const ACTION_OPTIONS = [
     { value: 'UPDATE', label: '更新' },
     { value: 'DELETE', label: '削除' },
     { value: 'EXPORT', label: 'エクスポート' },
+    { value: 'LOGIN', label: 'ログイン' },
+    { value: 'LOGOUT', label: 'ログアウト' },
+    { value: 'READ', label: '閲覧' },
 ]
 
 const ACTION_COLORS: Record<string, string> = {
@@ -67,15 +75,17 @@ const ACTION_COLORS: Record<string, string> = {
     EXPORT: 'bg-purple-100 text-purple-800',
     LOGIN: 'bg-yellow-100 text-yellow-800',
     LOGOUT: 'bg-gray-100 text-gray-800',
+    READ: 'bg-cyan-100 text-cyan-800',
 }
 
 const PAGE_SIZE = 50
 
-export function OperationLogsClient({ initialLogs, initialTotal, staffs }: OperationLogsClientProps) {
+export function OperationLogsClient({ initialLogs, initialTotal, staffs, initialStats }: OperationLogsClientProps) {
     const [logs, setLogs] = useState<OperationLog[]>(initialLogs)
     const [total, setTotal] = useState(initialTotal)
     const [loading, setLoading] = useState(false)
     const [page, setPage] = useState(0)
+    const [includeArchive, setIncludeArchive] = useState(false)
 
     // Filters
     const [startDate, setStartDate] = useState('')
@@ -93,6 +103,7 @@ export function OperationLogsClient({ initialLogs, initialTotal, staffs }: Opera
                 actorId: actorId === 'all' ? undefined : actorId || undefined,
                 targetResource: targetResource === 'all' ? undefined : targetResource || undefined,
                 actionType: actionType === 'all' ? undefined : actionType || undefined,
+                includeArchive,
                 limit: PAGE_SIZE,
                 offset: newPage * PAGE_SIZE
             })
@@ -102,7 +113,7 @@ export function OperationLogsClient({ initialLogs, initialTotal, staffs }: Opera
         } finally {
             setLoading(false)
         }
-    }, [startDate, endDate, actorId, targetResource, actionType])
+    }, [startDate, endDate, actorId, targetResource, actionType, includeArchive])
 
     const handleSearch = () => {
         fetchLogs(0)
@@ -136,6 +147,28 @@ export function OperationLogsClient({ initialLogs, initialTotal, staffs }: Opera
 
     return (
         <div className="space-y-4">
+            {/* Audit Stats Cards (#7) */}
+            {initialStats && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-white p-4 rounded-lg border shadow-sm">
+                        <div className="text-sm text-gray-500">本日の操作件数</div>
+                        <div className="text-2xl font-bold text-gray-900">{initialStats.todayTotal.toLocaleString()}</div>
+                    </div>
+                    <div className={`p-4 rounded-lg border shadow-sm ${initialStats.todayDeletes > 0 ? 'bg-red-50 border-red-200' : 'bg-white'}`}>
+                        <div className="text-sm text-gray-500">本日の削除操作</div>
+                        <div className={`text-2xl font-bold ${initialStats.todayDeletes > 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                            {initialStats.todayDeletes.toLocaleString()}
+                        </div>
+                    </div>
+                    <div className={`p-4 rounded-lg border shadow-sm ${initialStats.nightOps > 0 ? 'bg-yellow-50 border-yellow-200' : 'bg-white'}`}>
+                        <div className="text-sm text-gray-500">深夜帯操作（22:00-6:00）</div>
+                        <div className={`text-2xl font-bold ${initialStats.nightOps > 0 ? 'text-yellow-600' : 'text-gray-900'}`}>
+                            {initialStats.nightOps.toLocaleString()}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Filters */}
             <div className="bg-white p-4 rounded-lg border shadow-sm">
                 <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
@@ -209,6 +242,17 @@ export function OperationLogsClient({ initialLogs, initialTotal, staffs }: Opera
                             CSV
                         </Button>
                     </div>
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                    <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={includeArchive}
+                            onChange={(e) => setIncludeArchive(e.target.checked)}
+                            className="rounded border-gray-300"
+                        />
+                        1年以上前のアーカイブログも含めて表示
+                    </label>
                 </div>
             </div>
 

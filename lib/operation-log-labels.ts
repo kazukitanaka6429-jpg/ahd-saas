@@ -9,7 +9,10 @@ export const RESOURCE_LABELS: Record<string, string> = {
     resident: '利用者',
     staff: '職員',
     facility: '施設',
-    short_stay: 'ショートステイ'
+    short_stay: 'ショートステイ',
+    auth: '認証',
+    page_view: 'ページ閲覧',
+    notification: '通知'
 }
 
 export const ACTION_LABELS: Record<string, string> = {
@@ -18,7 +21,8 @@ export const ACTION_LABELS: Record<string, string> = {
     DELETE: '削除',
     EXPORT: 'エクスポート',
     LOGIN: 'ログイン',
-    LOGOUT: 'ログアウト'
+    LOGOUT: 'ログアウト',
+    READ: '閲覧'
 }
 
 export function getResourceLabel(resource: string): string {
