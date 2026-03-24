@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { getFacilityNotifications, FacilityNotification, NotificationFilters } from '@/app/actions/notifications'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -23,7 +23,7 @@ export function FacilityNotificationWidget() {
         resolved_by: 'all'
     })
 
-    const fetchNotifications = async (currentFilters: FilterValues = filters) => {
+    const fetchNotifications = useCallback(async (currentFilters: FilterValues) => {
         setLoading(true)
         const apiFilters: NotificationFilters = {
             year: currentFilters.year || undefined,
@@ -34,25 +34,27 @@ export function FacilityNotificationWidget() {
         const data = await getFacilityNotifications(apiFilters)
         setNotifications(data)
         setLoading(false)
-    }
+    }, [])
 
-    const loadStaffList = async () => {
+    const loadStaffList = useCallback(async () => {
         const list = await getStaffListForFilter()
         setStaffList(list)
-    }
+    }, [])
 
     useEffect(() => {
-        fetchNotifications()
+        fetchNotifications(filters)
+    }, [fetchNotifications, filters])
+
+    useEffect(() => {
         loadStaffList()
-    }, [])
+    }, [loadStaffList])
 
     const handleFilterChange = (newFilters: FilterValues) => {
         setFilters(newFilters)
-        fetchNotifications(newFilters)
     }
 
     return (
-        <Card>
+        <Card className="rounded-2xl border-gray-200 shadow-none bg-white">
             <CardHeader className="py-3 px-4 flex flex-col space-y-4">
                 <div className="flex flex-row items-center justify-between">
                     <CardTitle className="text-lg font-bold flex items-center gap-2">
@@ -83,12 +85,12 @@ export function FacilityNotificationWidget() {
                                 <div className="flex justify-between items-start mb-2">
                                     <div className="flex items-center gap-2">
                                         {note.status === 'resolved' ? (
-                                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 flex items-center gap-1">
+                                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 flex items-center gap-1 font-semibold">
                                                 <CheckCircle2 className="h-3 w-3" />
                                                 確認済み
                                             </Badge>
                                         ) : (
-                                            <Badge variant="secondary" className="bg-gray-100 text-gray-600 flex items-center gap-1">
+                                            <Badge variant="outline" className="bg-orange-50 text-orange-600 border-orange-200 flex items-center gap-1 font-semibold">
                                                 <Clock className="h-3 w-3" />
                                                 未確認
                                             </Badge>

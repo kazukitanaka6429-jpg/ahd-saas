@@ -21,7 +21,7 @@ export function DocumentAlertsWidget({ alerts: initialAlerts }: DocumentAlertsWi
 
     if (alerts.length === 0) {
         return (
-            <Card>
+            <Card className="rounded-2xl border-gray-200 shadow-none bg-white">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <FileWarning className="h-5 w-5" />
@@ -60,9 +60,9 @@ export function DocumentAlertsWidget({ alerts: initialAlerts }: DocumentAlertsWi
             case 'critical':
                 return <AlertTriangle className="h-4 w-4 text-red-500" />
             case 'warning':
-                return <AlertTriangle className="h-4 w-4 text-orange-500" />
+                return <AlertTriangle className="h-5 w-5 text-orange-500" />
             default:
-                return <Info className="h-4 w-4 text-blue-500" />
+                return <Info className="h-5 w-5 text-slate-500" />
         }
     }
 
@@ -73,7 +73,7 @@ export function DocumentAlertsWidget({ alerts: initialAlerts }: DocumentAlertsWi
             case 'warning':
                 return 'bg-orange-50 hover:bg-orange-100 border-l-4 border-l-orange-500'
             default:
-                return 'bg-blue-50 hover:bg-blue-100 border-l-4 border-l-blue-500'
+                return 'bg-slate-50 hover:bg-slate-100 border-l-4 border-l-slate-400'
         }
     }
 
@@ -92,7 +92,7 @@ export function DocumentAlertsWidget({ alerts: initialAlerts }: DocumentAlertsWi
     const warningCount = alerts.filter(a => a.alertLevel === 'warning').length
 
     return (
-        <Card>
+        <Card className="rounded-2xl border-gray-200 shadow-none bg-white">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <FileWarning className="h-5 w-5" />
@@ -113,7 +113,7 @@ export function DocumentAlertsWidget({ alerts: initialAlerts }: DocumentAlertsWi
                     {alerts.map((alert) => (
                         <div
                             key={alert.id}
-                            className={`flex items-center gap-4 p-3 rounded-md transition-colors ${getRowClass(alert.alertLevel)}`}
+                            className={`flex items-center gap-4 p-4 rounded-xl shadow-sm transition-colors cursor-pointer ${getRowClass(alert.alertLevel)}`}
                         >
                             <Checkbox
                                 id={`alert-${alert.id}`}

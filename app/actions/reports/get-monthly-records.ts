@@ -4,6 +4,9 @@ import { createClient } from '@/lib/supabase/server'
 import { getCurrentStaff } from '@/app/actions/auth' // Assuming auth exists here or lib/auth-helpers
 import { logger } from '@/lib/logger'
 import { protect } from '@/lib/auth-guard'
+import { SupabaseDailyRecordRepository } from '@/lib/repositories/daily-record-repository'
+
+const repository = new SupabaseDailyRecordRepository()
 
 export interface DailyRecordForReport {
     date: string
@@ -81,18 +84,11 @@ export async function getMonthlyResidentRecords(
         const lastDay = new Date(year, month, 0).getDate()
         const endDate = `${year}-${String(month).padStart(2, '0')}-${lastDay}`
 
-        // 3. Fetch Records
-        const { data: records, error: recError } = await supabase
-            .from('daily_records')
-            .select('date, data')
-            .eq('resident_id', residentId)
-            .gte('date', startDate)
-            .lte('date', endDate)
 
-        if (recError) {
-            logger.error('getMonthlyResidentRecords fetch error', recError)
-            return { error: '記録の取得に失敗しました' }
-        }
+
+        // 3. Fetch Records
+        // Use Repository
+        const records = await repository.findByResidentAndDateRange(residentId, startDate, endDate)
 
         // 4. Transform Map
         const recordMap: Record<string, DailyRecordForReport> = {}

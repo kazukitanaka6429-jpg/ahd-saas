@@ -30,7 +30,7 @@ const getDateTextColor = (dayType: 'weekday' | 'saturday' | 'sunday' | 'holiday'
         case 'saturday': return 'text-blue-600'
         case 'sunday': return 'text-red-600'
         case 'holiday': return 'text-red-600'
-        default: return 'text-slate-900'
+        default: return 'text-gray-900'
     }
 }
 
@@ -94,10 +94,10 @@ const MedicalVRowComponent = ({
             : 'bg-white'
 
     return (
-        <TableRow className="hover:bg-slate-50 h-10 group">
+        <TableRow className="hover:bg-gray-50/50 h-10 group transition-colors">
             {/* Date Column */}
             <TableCell
-                className={`sticky left-0 z-20 border-r border-b text-center font-bold text-base p-1 relative cursor-pointer ${bgColor} ${textColor}`}
+                className={`sticky left-0 z-20 border-r border-gray-200 border-b text-center font-bold text-base p-1 relative cursor-pointer ${bgColor} ${textColor}`}
                 onContextMenu={(e) => {
                     if (onDateContextMenu) {
                         e.preventDefault()
@@ -113,19 +113,19 @@ const MedicalVRowComponent = ({
             </TableCell>
 
             {/* Nurse Count Input */}
-            <TableCell className={`sticky left-[100px] z-20 border-r border-b p-0 ${isDailyDirty ? 'bg-amber-50' : 'bg-white'}`}>
+            <TableCell className={`sticky left-[100px] z-20 border-r border-gray-200 border-b p-0 ${isDailyDirty ? 'bg-orange-50' : 'bg-white'}`}>
                 <Input
                     type="number"
                     min={0}
                     placeholder="0"
-                    className="h-12 w-full border-none border-b border-r-0 border-t-0 border-l-0 text-center text-lg font-medium focus-visible:ring-2 focus-visible:ring-amber-400 rounded-none bg-transparent shadow-none"
+                    className="h-12 w-full border-none text-center text-lg font-medium focus-visible:ring-2 focus-visible:ring-orange-400 rounded-none bg-transparent shadow-none"
                     value={row.nurse_count || ''}
                     onChange={(e) => onDailyUpdate(row.date, e.target.value)}
                 />
             </TableCell>
 
             {/* Units Display */}
-            <TableCell className="sticky left-[200px] z-20 border-r border-b text-center text-lg font-medium p-0 bg-white text-slate-700">
+            <TableCell className="sticky left-[200px] z-20 border-r border-gray-200 border-b text-center text-lg font-medium p-0 bg-white text-gray-700">
                 {displayUnits}
             </TableCell>
 
@@ -138,8 +138,8 @@ const MedicalVRowComponent = ({
                 return (
                     <TableCell
                         key={r.id}
-                        className={`p-0 border-r border-b text-center h-10 w-[70px] transition-colors ${isCellDirty ? 'bg-amber-50' : ''
-                            } ${isDisabled ? 'bg-slate-100' : ''} group-hover:bg-slate-50`}
+                        className={`p-0 border-r border-gray-200 border-b text-center h-10 w-[70px] transition-colors ${isCellDirty ? 'bg-orange-50' : ''
+                            } ${isDisabled ? 'bg-gray-100' : ''} group-hover:bg-gray-50/50`}
                         title={isDisabled ? `入居日: ${r.start_date}` : ''}
                     >
                         <div className="flex items-center justify-center h-full w-full">
@@ -148,10 +148,10 @@ const MedicalVRowComponent = ({
                                 disabled={isDisabled}
                                 onCheckedChange={() => onToggle(row.date, r.id, isChecked, r)}
                                 className={`h-5 w-5 border-2 rounded transition-colors ${isDisabled
-                                    ? 'border-slate-300 bg-slate-200 cursor-not-allowed opacity-50'
+                                    ? 'border-gray-300 bg-gray-200 cursor-not-allowed opacity-50'
                                     : isChecked
-                                        ? 'bg-amber-500 border-amber-500 data-[state=checked]:bg-amber-500 data-[state=checked]:text-white'
-                                        : 'border-slate-300 hover:border-amber-400'
+                                        ? 'bg-orange-500 border-orange-500 data-[state=checked]:bg-orange-500 data-[state=checked]:text-white'
+                                        : 'border-gray-300 hover:border-orange-400'
                                     }`}
                             />
                         </div>

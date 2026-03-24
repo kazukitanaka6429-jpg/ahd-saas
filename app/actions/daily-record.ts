@@ -12,6 +12,15 @@ import { logOperation } from '@/lib/operation-logger'
 /**
  * Get matrix data for daily report page
  */
+import { SupabaseDailyRecordRepository } from '@/lib/repositories/daily-record-repository'
+
+// ... (imports)
+
+const repository = new SupabaseDailyRecordRepository()
+
+/**
+ * Get matrix data for daily report page
+ */
 export async function getDailyMatrix(date: string, facilityIdOverride?: string) {
     try {
         await protect()
@@ -29,29 +38,22 @@ export async function getDailyMatrix(date: string, facilityIdOverride?: string) 
         const supabase = await createClient()
 
         // Fetch Residents and Records in parallel
-        const [residentsRes, recordsRes] = await Promise.all([
+        // Repository used for Records
+        const [residentsRes, records] = await Promise.all([
             supabase.from('residents')
                 .select('*')
                 .eq('facility_id', facilityId)
-                // Filter out those who left long ago? 
-                // Usually daily report needs logic: "Show residents who were present ON THAT DAY"
-                // For now, simplify to "status != left" OR "left_date >= date" ?
-                // Let's just fetch all active residents + recently left.
-                // For now, simple active check.
-                .neq('status', 'left') // TODO: Handle 'left' residents if needed for past reports
+                .neq('status', 'left')
                 .order('display_id', { ascending: true, nullsFirst: false }),
 
-            supabase.from('daily_records')
-                .select('*')
-                .eq('facility_id', facilityId)
-                .eq('date', date)
+            repository.findByDateAndFacility(facilityId, date)
         ])
 
         if (residentsRes.error) return { error: residentsRes.error.message }
-        if (recordsRes.error) return { error: recordsRes.error.message }
+        // repository throws error on failure, so if we are here, it succeeded.
 
         const residents = residentsRes.data as Resident[]
-        const records = recordsRes.data as DailyRecord[] // Type assertion needed for JSONB
+        // records is DailyRecord[]
 
         // Map records by resident_id
         const recordMap: Record<string, DailyRecord> = {}
@@ -106,6 +108,8 @@ export interface DailyRecordInput {
     other_welfare_service?: string | null
 }
 
+// ... (DailyRecordInput interface)
+
 export async function upsertDailyRecords(records: DailyRecordInput[], facilityIdOverride?: string) {
     try {
         await protect()
@@ -118,38 +122,30 @@ export async function upsertDailyRecords(records: DailyRecordInput[], facilityId
             facilityId = facilityIdOverride
         }
 
-        // Fallback: lookup from resident if needed (for admin bulk op across facilities? rare)
-        // Assuming all records belong to the same facility context for the matrix.
-
         if (!facilityId) {
             return { error: 'Facility context required' }
         }
 
         if (records.length === 0) return { success: true }
 
-        const supabase = await createClient()
         const date = records[0].date
 
         // 1. Fetch existing records to merge JSONB data
-        const residentsIds = records.map(r => r.resident_id)
-        const { data: existingRecords } = await supabase
-            .from('daily_records')
-            .select('*')
-            .eq('facility_id', facilityId)
-            .eq('date', date)
-            .in('resident_id', residentsIds)
-
-        const existingMap = new Map(existingRecords?.map(r => [r.resident_id, r]) || [])
+        // We can use findByDateAndFacility to get all records for that day, then filter in memory
+        // This avoids complex "in" clause in repository for now (Repository should start simple)
+        // Or we can add findByResidentsAndDate to repository later.
+        // For now, fetching all for the day is fine as it's not huge data per facility.
+        const existingRecords = await repository.findByDateAndFacility(facilityId, date)
+        const existingMap = new Map(existingRecords.map(r => [r.resident_id, r]))
 
         const upsertPayload = records.map(r => {
             const existing = existingMap.get(r.resident_id)
             const existingData = (existing?.data as Record<string, any>) || {}
 
             // Extraction helpers
+            // ... (same logic as before)
             const getVal = <T>(key: keyof DailyRecordInput, existingKey: string, defaultVal: T): T => {
-                // Priority: Input > Existing(Row) > Existing(Data) > Default
                 if (r[key] !== undefined) return r[key] as T
-                // Note: existing row might not have property if it's not a column (but here we only check known columns)
                 // @ts-ignore
                 if (existing && existing[existingKey] !== undefined && existing[existingKey] !== null) return existing[existingKey] as T
                 // @ts-ignore
@@ -185,28 +181,17 @@ export async function upsertDailyRecords(records: DailyRecordInput[], facilityId
             }
 
             return {
-                // RLS requirement: organization_id is mandatory and enforced by policy
                 organization_id: staff.organization_id,
-                facility_id: facilityId,
+                facility_id: facilityId!,
                 resident_id: r.resident_id,
                 date: r.date,
-                data: newData, // All business data is now inside JSONB
-
-                // NOTE: Top-level columns (meal_breakfast etc.) are removed as they don't exist in the new partitioned scheme.
-                // unique constraints are checked against (resident_id, date).
-
+                data: newData,
                 updated_at: new Date().toISOString()
             }
         })
 
-        const { error } = await supabase
-            .from('daily_records')
-            .upsert(upsertPayload, { onConflict: 'resident_id, date' })
-
-        if (error) {
-            logger.error('upsertDailyRecords failed', error)
-            return { error: translateError(error.message) }
-        }
+        // Use Repository to Upsert
+        await repository.upsert(upsertPayload)
 
         // Audit Log
         if (records.length > 0) {
@@ -249,16 +234,12 @@ export async function resetDailyRecords(date: string, facilityId: string) {
 
         const supabase = await createClient()
 
-        // 1. Delete daily_records for the date and facility
-        const { error: dailyRecordsError } = await supabase
-            .from('daily_records')
-            .delete()
-            .eq('facility_id', facilityId)
-            .eq('date', date)
-
-        if (dailyRecordsError) {
-            logger.error('resetDailyRecords: daily_records delete failed', dailyRecordsError)
-            return { error: translateError(dailyRecordsError.message) }
+        // 1. Delete daily_records via Repository
+        try {
+            await repository.deleteByDateAndFacility(facilityId, date)
+        } catch (e: any) {
+            logger.error('resetDailyRecords: daily_records delete failed', e)
+            return { error: translateError(e.message) }
         }
 
         // 2. Delete daily_shifts for the date and facility

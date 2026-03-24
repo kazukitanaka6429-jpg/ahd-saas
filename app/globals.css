@@ -50,61 +50,53 @@
 }
 
 :root {
-  --radius: 0.75rem;
-  /* Slightly rounder for friendly feel */
-  --background: #FDFBF7;
-  /* Warm Paper White */
-  --foreground: #433D3C;
-  /* Warm Charcoal */
+  --radius: 1rem; /* Softer, premium roundness */
+  --background: #F8F9FA; /* Very light clean gray */
+  --foreground: #111827; /* Crisp dark text */
 
   --card: #ffffff;
-  --card-foreground: #433D3C;
+  --card-foreground: #111827;
 
   --popover: #ffffff;
-  --popover-foreground: #433D3C;
+  --popover-foreground: #111827;
 
-  --primary: #C86B4D;
-  /* Terracotta (Logo Smile) */
+  --primary: #EA580C; /* Vibrant premium orange */
   --primary-foreground: #ffffff;
-  --primary-hover: #B0553A;
-  --primary-light: #F2E8E5;
+  --primary-hover: #C2410C;
+  --primary-light: #FFEDD5;
 
-  --secondary: #4D8C96;
-  /* Teal (Logo Sol) */
-  --secondary-foreground: #ffffff;
-  --secondary-dark: #3A6F78;
+  --secondary: #F3F4F6; /* Soft gray for secondary buttons */
+  --secondary-foreground: #111827;
+  --secondary-dark: #E5E7EB;
 
-  --muted: #F2E8E5;
-  /* Light Terracotta Wash */
-  --muted-foreground: #8C8685;
+  --muted: #F3F4F6;
+  --muted-foreground: #6B7280;
 
-  --accent: #FDFBF7;
-  --accent-foreground: #C86B4D;
+  --accent: #FFEDD5; /* Light orange for subtle highlights */
+  --accent-foreground: #EA580C;
 
-  --destructive: oklch(0.577 0.245 27.325);
+  --destructive: #EF4444; 
   --destructive-foreground: #ffffff;
 
-  --border: #E5E0D8;
-  /* Warm Grey */
-  --input: #E5E0D8;
-  --ring: #C86B4D;
+  --border: #E5E7EB;
+  --input: #E5E7EB;
+  --ring: #EA580C;
 
-  --chart-1: #C86B4D;
-  --chart-2: #4D8C96;
-  --chart-3: #E8B04D;
-  /* Logo Sun/Yellow */
-  --chart-4: #8C8685;
-  --chart-5: #E5E0D8;
+  /* Chart Colors aligned with the new UI */
+  --chart-1: #EA580C; /* Orange */
+  --chart-2: #10B981; /* Green for success/compliance */
+  --chart-3: #F59E0B; /* Amber for warnings */
+  --chart-4: #6366F1; /* Indigo */
+  --chart-5: #E5E7EB; /* Gray */
 
-  --sidebar: #F9F6F0;
-  /* Light Cream */
-  --sidebar-foreground: #433D3C;
-  --sidebar-primary: #C86B4D;
+  --sidebar: #ffffff; /* Clean white sidebar */
+  --sidebar-foreground: #111827;
+  --sidebar-primary: #EA580C;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #E5E0D8;
-  --sidebar-accent-foreground: #433D3C;
-  --sidebar-border: #E5E0D8;
-  --sidebar-ring: #C86B4D;
+  --sidebar-accent: #FFEDD5;
+  --sidebar-accent-foreground: #EA580C;
+  --sidebar-border: #E5E7EB;
+  --sidebar-ring: #EA580C;
 }
 
 /* 

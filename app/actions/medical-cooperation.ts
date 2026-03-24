@@ -40,26 +40,16 @@ const calculateUnits = (nurseCount: number, residentCount: number): number => {
 }
 
 // Helper to get daily nurse count from Records
-async function getDailyNurseCounts(supabase: any, facilityId: string, startDate: string, endDate: string) {
-    const { data: recordsData } = await supabase
-        .from('medical_cooperation_records')
-        .select('date, staff_id')
-        .eq('facility_id', facilityId)
-        .gte('date', startDate)
-        .lte('date', endDate)
-        .not('staff_id', 'is', null)
+// Removed unused getDailyNurseCounts
 
-    const dailyMap = new Map<string, Set<string>>()
-    recordsData?.forEach((r: any) => {
-        if (!dailyMap.has(r.date)) dailyMap.set(r.date, new Set())
-        if (r.staff_id) dailyMap.get(r.date)!.add(r.staff_id)
-    })
 
-    const counts = new Map<string, number>()
-    dailyMap.forEach((set, date) => counts.set(date, set.size))
-    return counts
-}
 
+// Unit Values (Updated per user request)
+const UNIT_IV_1 = 800 // Ⅳ1：800単位
+const UNIT_IV_2 = 500 // Ⅳ2：500単位
+const UNIT_IV_3 = 400 // Ⅳ3：400単位
+
+import { calculateMedicalCooperationCategory, Visit, StaffQualification } from '@/lib/medical-cooperation/calculator'
 
 export async function getMedicalCooperationMatrix(
     year: number,
@@ -98,7 +88,7 @@ export async function getMedicalCooperationMatrix(
         const daysInMonth = lastDayObj.getDate()
         const endDateStr = `${year}-${String(month).padStart(2, '0')}-${daysInMonth}`
 
-        // Fetch Residents (In Facility) - Typed for compile-time safety
+        // Fetch Residents (In Facility)
         const { data: residents } = await supabase
             .from('residents')
             .select('*')
@@ -117,31 +107,78 @@ export async function getMedicalCooperationMatrix(
         // Target Count (Sputum Suction)
         const targetCount = residents.filter(r => r.sputum_suction).length
 
-        // Fetch Records (with explicit limit to avoid Supabase 1000 row default) - Typed for compile-time safety
+        // Fetch Records
         const { data: recordsData } = await supabase
             .from('medical_cooperation_records')
             .select('*')
             .eq('facility_id', facilityId)
             .gte('date', startDateStr)
             .lte('date', endDateStr)
-            .limit(10000)
             .returns<MedicalCooperationRecordRow[]>()
 
-        // Calculate Daily Nurse Counts (On the fly, no separate table dependency)
-        const nurseCounts = await getDailyNurseCounts(supabase, facilityId, startDateStr, endDateStr)
+        // Fetch Staff Qualifications for Calculation
+        // Join staff -> (optional) qualifications ? Schema might vary.
+        // Assuming we need to fetch all staff in facility and their qualifications.
+        // The type `Staff` has "qualification_name" purely as UI helper, but actual table `staffs` links to `qualifications` via `qualification_id`?
+        // Let's check `staffs` table structure via query or assume `qualification_id` exists.
+        // Or fetch `staffs` with `qualifications` joined.
 
+        // Map to StaffQualification[]
+        // Define localized type for query result
+        type StaffWithQual = {
+            id: string
+            qualifications: {
+                is_medical_coord_iv_target: boolean // Correct DB column name from schema?
+            } | null
+        }
 
+        // Wait, schema says `is_medical_coord_iv_target` in `qualifications` table (line 351 in database.ts).
+        // The query in line 149 says `is_medical_target`. I should fix the query too if it's wrong.
+        // Let's check database.ts again. 
+        // database.ts: 351: is_medical_coord_iv_target: boolean
+
+        // So the query WAS wrong (or using an alias I didn't see).
+        // I will fix the query to `is_medical_coord_iv_target` and use strict type.
+
+        const { data: staffData } = await supabase
+            .from('staffs')
+            .select(`
+                id,
+                qualifications!inner (
+                    is_medical_coord_iv_target
+                )
+            `)
+            .eq('facility_id', facilityId)
+        // Use .returns if needed, or just let inference work with generic if supported, 
+        // but manual typing is safer here without full generated types for joins.
+        // Using 'any' removal strategy:
+
+        const staffQualifications: StaffQualification[] = (staffData as any[])?.map(s => ({
+            staffId: s.id,
+            isMedicalTarget: s.qualifications?.is_medical_coord_iv_target || false
+        })) || []
 
         // Construct Matrix
         const rows: MedicalCooperationRow[] = []
 
         // Group records by date -> resident_id -> { staff_id, record_id }
         const recordMap = new Map<string, Record<string, { staffId: string | null, recordId: string }>>()
+        const dailyVisitsMap = new Map<string, Visit[]>()
+
         recordsData?.forEach((r: MedicalCooperationRecordRow) => {
             if (!recordMap.has(r.date)) recordMap.set(r.date, {})
             recordMap.get(r.date)![r.resident_id] = {
                 staffId: r.staff_id,
                 recordId: r.id
+            }
+
+            // Build Visits array for calculation
+            if (r.staff_id) {
+                if (!dailyVisitsMap.has(r.date)) dailyVisitsMap.set(r.date, [])
+                dailyVisitsMap.get(r.date)!.push({
+                    staffId: r.staff_id,
+                    residentId: r.resident_id
+                })
             }
         })
 
@@ -161,13 +198,27 @@ export async function getMedicalCooperationMatrix(
                 }
             })
 
-            const count = nurseCounts.get(dateStr) || 0
+            // Perform Calculation using Logic
+            const visits = dailyVisitsMap.get(dateStr) || []
+
+            // Identify unique nurses working today
+            const activeNurses = new Set(visits.map(v => v.staffId))
+            const count = activeNurses.size
+
+            let totalUnits = 0
+
+            // Sum units for each nurse
+            activeNurses.forEach(staffId => {
+                const category = calculateMedicalCooperationCategory(visits, staffId, staffQualifications)
+                if (category === 'IV 1') totalUnits += UNIT_IV_1
+                if (category === 'IV 2') totalUnits += UNIT_IV_2
+                if (category === 'IV 3') totalUnits += UNIT_IV_3
+            })
 
             rows.push({
-                // dailyId: daily?.id, // No longer used or needed
                 date: dateStr,
                 nurse_count: count,
-                calculated_units: calculateUnits(count, targetCount), // Use helper
+                calculated_units: totalUnits, // Real calculation
                 records: dayRecords,
                 recordIds: dayRecordIds
             })

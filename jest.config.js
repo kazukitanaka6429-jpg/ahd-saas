@@ -2,9 +2,10 @@
 module.exports = {
     preset: 'ts-jest',
     testEnvironment: 'jsdom',
-    // Look for tests in __tests__ folder
     testMatch: ['**/__tests__/**/*.test.ts'],
+    setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
     moduleNameMapper: {
         '^@/(.*)$': '<rootDir>/$1',
+        '^server-only$': '<rootDir>/__tests__/__mocks__/empty.js',
     },
 };

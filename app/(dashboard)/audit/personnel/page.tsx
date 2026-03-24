@@ -41,8 +41,8 @@ export default async function PersonnelAuditPage({ searchParams }: { searchParam
 
     return (
         <div className="container mx-auto py-6 space-y-6 print:space-y-4 print:py-2">
-            <div className="flex flex-col gap-4 print:hidden">
-                <h1 className="text-2xl font-bold tracking-tight">人員配置チェック</h1>
+            <div className="flex flex-col gap-6 print:hidden">
+                <h1 className="text-3xl font-bold tracking-tight text-gray-900">人員配置チェック</h1>
                 <div className="flex items-center justify-between flex-wrap gap-4">
                     <div className="flex items-center gap-4">
                         <span className="text-sm text-muted-foreground bg-gray-100 px-2 py-1 rounded">{facilityName}</span>
@@ -88,9 +88,9 @@ export default async function PersonnelAuditPage({ searchParams }: { searchParam
                 </div>
             )}
 
-            <Card className="print:shadow-none print:border-gray-300">
+            <Card className="rounded-2xl border-gray-200 shadow-none bg-white print:shadow-none print:border-gray-300">
                 <CardHeader>
-                    <CardTitle>勤務・配置タイムライン</CardTitle>
+                    <CardTitle className="text-xl font-bold text-gray-900">勤務・配置タイムライン</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <TimelineChart
@@ -116,10 +116,10 @@ export default async function PersonnelAuditPage({ searchParams }: { searchParam
 function StatusCard({ result, title, sub }: { result: any, title: string, sub: string }) {
     const isOk = result.status === 'ok'
     return (
-        <Card className={`${isOk ? "border-l-4 border-l-green-500" : "border-l-4 border-l-red-500"} print:shadow-none print:break-inside-avoid`}>
-            <CardHeader className="pb-2">
-                <CardTitle className="text-base">{title}</CardTitle>
-                <p className="text-xs text-muted-foreground">{sub}</p>
+        <Card className={`${isOk ? "border-t-4 border-t-green-500" : "border-t-4 border-t-red-500"} rounded-2xl border-l border-r border-b border-gray-200 shadow-none bg-white print:shadow-none print:break-inside-avoid`}>
+            <CardHeader className="pb-2 bg-gray-50/30 rounded-t-2xl">
+                <CardTitle className="text-lg font-bold text-gray-800">{title}</CardTitle>
+                <p className="text-xs text-gray-500">{sub}</p>
             </CardHeader>
             <CardContent>
                 <ul className="list-disc pl-5 space-y-2 text-sm">

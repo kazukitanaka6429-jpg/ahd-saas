@@ -154,13 +154,16 @@ export function MedicalCooperationGrid({ matrix, nurses, currentDate, findingsIn
     }
 
     return (
-        <div className="border rounded-md bg-white overflow-hidden flex flex-col h-full shadow-sm">
-            <div className="bg-gray-50 border-b px-4 py-2 flex justify-between items-center h-14 shrink-0">
-                <div className="font-bold text-gray-700">医療連携記録</div>
+        <div className="border border-gray-200 rounded-2xl bg-white overflow-hidden flex flex-col h-full shadow-sm">
+            <div className="bg-white border-b border-gray-200 px-5 py-3 flex justify-between items-center h-[60px] shrink-0">
+                <div className="font-bold text-gray-800 flex items-center gap-2">
+                    <span className="w-1.5 h-4 bg-orange-500 rounded-full mr-1"></span>
+                    医療連携記録
+                </div>
                 <Button
                     onClick={onSave}
                     disabled={isSaving || pendingChanges.size === 0}
-                    className="bg-green-600 hover:bg-green-700 text-white font-bold"
+                    className="bg-orange-600 hover:bg-orange-700 text-white font-bold h-9 px-5 rounded-xl shadow-sm transition-all"
                 >
                     {isSaving ? (
                         <>
@@ -220,12 +223,12 @@ export function MedicalCooperationGrid({ matrix, nurses, currentDate, findingsIn
             )}
             <div className="overflow-auto flex-1">
                 <Table className="min-w-max border-separate border-spacing-0">
-                    <TableHeader className="sticky top-0 bg-gray-50 z-30 shadow-sm">
+                    <TableHeader className="sticky top-0 bg-[#Fdfbf9] z-30 shadow-sm border-b border-gray-200">
                         <TableRow>
-                            <TableHead className="w-[50px] min-w-[50px] bg-gray-50 sticky left-0 z-30 border-r border-b text-center font-bold text-xs">No</TableHead>
-                            <TableHead className="w-[150px] min-w-[150px] bg-gray-50 sticky left-[50px] z-30 border-r border-b text-center font-bold text-xs drop-shadow-md">利用者名</TableHead>
+                            <TableHead className="w-[50px] min-w-[50px] bg-gray-100 sticky left-0 z-30 border-r border-gray-200 border-b text-center font-bold text-xs text-gray-700">No</TableHead>
+                            <TableHead className="w-[150px] min-w-[150px] bg-gray-100 sticky left-[50px] z-30 border-r border-gray-200 border-b text-center font-bold text-xs text-gray-700 drop-shadow-md">利用者名</TableHead>
                             {days.map(day => (
-                                <TableHead key={day} className={`w-[40px] min-w-[40px] text-center border-r border-b p-0 h-8 text-xs ${[6, 0].includes(new Date(year, month, day).getDay()) ? 'bg-orange-50 text-orange-900' : ''}`}>
+                                <TableHead key={day} className={`w-[40px] min-w-[40px] text-center border-r border-gray-200 border-b p-0 h-8 text-xs text-gray-700 ${[6, 0].includes(new Date(year, month, day).getDay()) ? 'bg-orange-50 text-orange-900' : 'bg-[#Fdfbf9]'}`}>
                                     {day}
                                 </TableHead>
                             ))}
@@ -235,11 +238,11 @@ export function MedicalCooperationGrid({ matrix, nurses, currentDate, findingsIn
                         {filteredResidents.map((resident, index) => {
                             const unitName = units.find(u => u.id === resident.unit_id)?.name
                             return (
-                                <TableRow key={resident.id} className="hover:bg-gray-50/50">
-                                    <TableCell className="sticky left-0 bg-white z-20 border-r border-b font-medium text-center text-xs">
+                                <TableRow key={resident.id} className="hover:bg-gray-50/50 transition-colors">
+                                    <TableCell className="sticky left-0 bg-white z-20 border-r border-gray-200 border-b font-medium text-center text-xs text-gray-700">
                                         {index + 1}
                                     </TableCell>
-                                    <TableCell className="sticky left-[50px] bg-white z-20 border-r border-b font-medium text-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px] drop-shadow-sm">
+                                    <TableCell className="sticky left-[50px] bg-white z-20 border-r border-gray-200 border-b font-medium text-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px] drop-shadow-sm text-gray-800">
                                         <div className="flex flex-col items-center justify-center">
                                             <span>{resident.name}</span>
                                             {selectedUnitId === 'all' && unitName && (
@@ -257,8 +260,8 @@ export function MedicalCooperationGrid({ matrix, nurses, currentDate, findingsIn
 
                                         let bgClass = 'bg-transparent'
                                         if (staffId) {
-                                            if (nurseLoad === 2) bgClass = 'bg-yellow-100'
-                                            else if (nurseLoad >= 3) bgClass = 'bg-blue-100'
+                                            if (nurseLoad === 2) bgClass = 'bg-orange-50'
+                                            else if (nurseLoad >= 3) bgClass = 'bg-orange-100/80'
                                         }
 
                                         const isPending = pendingChanges.has(`${resident.id}:${dateStr}`)
@@ -267,7 +270,7 @@ export function MedicalCooperationGrid({ matrix, nurses, currentDate, findingsIn
                                             <TableCell
                                                 key={day}
                                                 className={cn(
-                                                    "p-0 border-r border-b min-w-[40px] h-8 text-center padding-0 relative",
+                                                    "p-0 border-r border-gray-200 border-b min-w-[40px] h-8 text-center padding-0 relative transition-colors",
                                                     bgClass,
                                                     isPending && 'ring-2 ring-orange-400 ring-inset'
                                                 )}
@@ -280,7 +283,7 @@ export function MedicalCooperationGrid({ matrix, nurses, currentDate, findingsIn
                                                 >
                                                     <option value="none" className="text-gray-400">-</option>
                                                     {nurses.map(nurse => (
-                                                        <option key={nurse.id} value={nurse.id} className="text-black">
+                                                        <option key={nurse.id} value={nurse.id} className="text-gray-800 font-medium">
                                                             {nurse.name}
                                                         </option>
                                                     ))}

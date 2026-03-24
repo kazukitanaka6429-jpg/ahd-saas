@@ -54,8 +54,8 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-            <Card className="w-full max-w-md">
+        <div className="flex min-h-screen items-center justify-center bg-background px-4">
+            <Card className="w-full max-w-md border-gray-100 shadow-xl rounded-3xl overflow-hidden mb-12">
                 <CardHeader className="space-y-1">
                     <CardTitle className="flex justify-center py-4">
                         <div className="relative w-full max-w-[280px] p-4">
@@ -68,8 +68,7 @@ export default function LoginPage() {
                                 style={{
                                     width: '100%',
                                     height: 'auto',
-                                    mixBlendMode: 'multiply',
-                                    transform: 'scale(1.1)'
+                                    transform: 'scale(1.05)'
                                 }}
                                 priority
                             />

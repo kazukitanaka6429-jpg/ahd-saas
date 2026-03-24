@@ -8,6 +8,9 @@ import { protect } from '@/lib/auth-guard'
 import { logger } from '@/lib/logger'
 import { translateError } from '@/lib/error-translator'
 import { logOperation } from '@/lib/operation-logger'
+import { SupabaseDailyRecordRepository } from '@/lib/repositories/daily-record-repository'
+
+const dailyRecordRepo = new SupabaseDailyRecordRepository()
 
 // Helper: Recalculate Medical V units for the entire current month
 // Called when sputum_suction flag changes for any resident
@@ -316,15 +319,11 @@ export async function deleteResident(id: string) {
 // 利用者に関連するデータをチェックし、削除可能かを判定
 async function checkResidentRelatedData(supabase: any, residentId: string): Promise<{ hasData: boolean; message: string }> {
     // 1. 業務日誌 (daily_records)
-    const { data: dailyRecords } = await supabase
-        .from('daily_records')
-        .select('date')
-        .eq('resident_id', residentId)
-        .order('date', { ascending: false })
-        .limit(1)
+    // Use Repository
+    const latestRecord = await dailyRecordRepo.findMostRecentByResident(residentId)
 
-    if (dailyRecords && dailyRecords.length > 0) {
-        const date = new Date(dailyRecords[0].date)
+    if (latestRecord) {
+        const date = new Date(latestRecord.date)
         return {
             hasData: true,
             message: `${date.getMonth() + 1}月${date.getDate()}日に業務日誌の記録があるため削除できません。先に関連データを削除してください。`

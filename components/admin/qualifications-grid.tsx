@@ -21,13 +21,13 @@ export function QualificationsGrid({ data }: { data: Qualification[] }) {
     // handleDelete logic moved to DeleteButton component
 
     return (
-        <div className="border rounded-md">
+        <div className="border border-gray-200 rounded-2xl bg-white shadow-sm overflow-hidden">
             <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>資格名</TableHead>
-                        <TableHead>医療連携対象</TableHead>
-                        <TableHead className="w-[100px]">操作</TableHead>
+                <TableHeader className="bg-[#Fdfbf9]">
+                    <TableRow className="hover:bg-transparent">
+                        <TableHead className="font-bold text-gray-700 h-12">資格名</TableHead>
+                        <TableHead className="font-bold text-gray-700 h-12">医療連携対象</TableHead>
+                        <TableHead className="w-[100px] font-bold text-gray-700 h-12 text-center">操作</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -39,21 +39,21 @@ export function QualificationsGrid({ data }: { data: Qualification[] }) {
                         </TableRow>
                     ) : (
                         data.map((item) => (
-                            <TableRow key={item.id}>
-                                <TableCell className="font-medium">{item.name}</TableCell>
-                                <TableCell>
+                            <TableRow key={item.id} className="hover:bg-gray-50/50 transition-colors">
+                                <TableCell className="font-medium text-gray-800 h-14">{item.name}</TableCell>
+                                <TableCell className="h-14">
                                     {item.is_medical_coord_iv_target && (
-                                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                        <Badge variant="outline" className="bg-orange-50 text-orange-600 border-orange-200">
                                             対象
                                         </Badge>
                                     )}
                                 </TableCell>
-                                <TableCell>
-                                    <div className="flex items-center gap-2">
+                                <TableCell className="h-14">
+                                    <div className="flex items-center justify-center gap-2">
                                         <QualificationForm
                                             initialData={item}
                                             trigger={
-                                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                <Button variant="ghost" size="icon" className="h-9 w-9 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded-xl transition-colors">
                                                     <Pencil className="h-4 w-4" />
                                                 </Button>
                                             }
@@ -63,7 +63,7 @@ export function QualificationsGrid({ data }: { data: Qualification[] }) {
                                             onDelete={deleteQualification}
                                             iconOnly
                                             confirmMessage={`資格「${item.name}」を削除してもよろしいですか？`}
-                                            className="h-8 w-8 text-destructive hover:text-destructive"
+                                            className="h-9 w-9 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition-colors"
                                         />
                                     </div>
                                 </TableCell>

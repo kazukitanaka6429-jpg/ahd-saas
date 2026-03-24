@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { getUnresolvedNotifications, getResolvedNotifications, resolveNotification, FacilityNotification } from '@/app/actions/notifications'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -31,19 +31,7 @@ export function NotificationWidget() {
         resolved_by: 'all'
     })
 
-    const fetchNotifications = async () => {
-        setLoading(true)
-        const data = await getUnresolvedNotifications()
-        setNotifications(data)
-
-        if (activeTab === 'history') {
-            await fetchResolved(filters)
-        }
-
-        setLoading(false)
-    }
-
-    const fetchResolved = async (currentFilters: FilterValues) => {
+    const fetchResolved = useCallback(async (currentFilters: FilterValues) => {
         // Convert empty strings to undefined for API
         const apiFilters: NotificationFilters = {
             year: currentFilters.year || undefined,
@@ -53,23 +41,35 @@ export function NotificationWidget() {
         }
         const data = await getResolvedNotifications(apiFilters)
         setResolvedNotifications(data)
-    }
+    }, [])
 
-    const loadStaffList = async () => {
+    const fetchNotifications = useCallback(async () => {
+        setLoading(true)
+        const data = await getUnresolvedNotifications()
+        setNotifications(data)
+
+        if (activeTab === 'history') {
+            await fetchResolved(filters)
+        }
+
+        setLoading(false)
+    }, [activeTab, filters, fetchResolved])
+
+    const loadStaffList = useCallback(async () => {
         const list = await getStaffListForFilter()
         setStaffList(list)
-    }
+    }, [])
 
     useEffect(() => {
         fetchNotifications()
         loadStaffList()
-    }, [])
+    }, [fetchNotifications, loadStaffList])
 
     useEffect(() => {
         if (activeTab === 'history') {
             fetchResolved(filters)
         }
-    }, [activeTab])
+    }, [activeTab, filters, fetchResolved])
 
     const handleFilterChange = (newFilters: FilterValues) => {
         setFilters(newFilters)
@@ -126,17 +126,17 @@ export function NotificationWidget() {
             </div>
 
             <Tabs defaultValue="inbox" value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-4">
-                    <TabsTrigger value="inbox" className="flex items-center gap-2">
+                <TabsList className="grid w-full grid-cols-2 mb-4 bg-[#F5EBE1] rounded-2xl p-1 h-12">
+                    <TabsTrigger value="inbox" className="flex items-center gap-2 rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm h-full font-medium">
                         <Inbox className="h-4 w-4" />
                         未確認
                         {notifications.length > 0 && (
-                            <Badge variant="secondary" className="ml-1 px-1.5 h-5 min-w-[20px] justify-center">
+                            <Badge variant="secondary" className="ml-1 px-1.5 h-5 min-w-[20px] justify-center bg-white text-gray-800 border-none shadow-sm">
                                 {notifications.length}
                             </Badge>
                         )}
                     </TabsTrigger>
-                    <TabsTrigger value="history" className="flex items-center gap-2">
+                    <TabsTrigger value="history" className="flex items-center gap-2 rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm h-full font-medium">
                         <History className="h-4 w-4" />
                         確認済み履歴
                     </TabsTrigger>
@@ -147,9 +147,9 @@ export function NotificationWidget() {
                     {loading && notifications.length === 0 ? (
                         <div className="text-gray-500 text-sm p-4 text-center">読み込み中...</div>
                     ) : notifications.length === 0 ? (
-                        <Card>
+                        <Card className="rounded-2xl border-gray-200 shadow-none bg-white">
                             <CardContent>
-                                <div className="text-gray-400 text-sm py-8 text-center">
+                                <div className="text-[#a09a95] text-sm py-12 text-center">
                                     現在、未確認の連絡はありません
                                 </div>
                             </CardContent>
@@ -159,7 +159,7 @@ export function NotificationWidget() {
                             {Object.entries(groupedInbox).map(([facilityName, notes]) => {
                                 const hasHighPriority = notes.some((n) => n.priority === 'high')
                                 return (
-                                    <Card key={facilityName} className={cn("overflow-hidden border-t-4", hasHighPriority ? "border-t-red-500" : "border-t-blue-500")}>
+                                    <Card key={facilityName} className={cn("overflow-hidden rounded-2xl border-gray-200", hasHighPriority ? "border-t-4 border-t-red-500" : "")}>
                                         <CardHeader className="bg-gray-50/50 py-3 px-4 flex flex-row items-center justify-between space-y-0">
                                             <div className="font-bold flex items-center gap-2">{facilityName}</div>
                                             {hasHighPriority && (
@@ -173,7 +173,7 @@ export function NotificationWidget() {
                                                 {notes.map((note) => (
                                                     <div key={note.id} className="p-4 flex gap-3 hover:bg-gray-50 transition-colors">
                                                         <div className="shrink-0 pt-1">
-                                                            {note.priority === 'high' ? <AlertCircle className="h-5 w-5 text-red-500" /> : <div className="h-2 w-2 rounded-full bg-blue-400 m-1.5" />}
+                                                            {note.priority === 'high' ? <AlertCircle className="h-5 w-5 text-red-500" /> : <div className="h-2 w-2 rounded-full bg-orange-400 m-1.5" />}
                                                         </div>
                                                         <div className="flex-1 space-y-1">
                                                             <p className={cn("text-sm leading-relaxed", note.priority === 'high' && "font-medium")}>{note.content}</p>
@@ -184,8 +184,8 @@ export function NotificationWidget() {
                                                             </div>
                                                         </div>
                                                         <div className="shrink-0">
-                                                            <Button size="sm" variant="outline" className="h-8 text-xs hover:bg-green-50 hover:text-green-600 hover:border-green-200" onClick={() => handleResolve(note.id)}>
-                                                                <CheckCircle2 className="h-3 w-3 mr-1" /> 確認
+                                                            <Button size="sm" variant="outline" className="h-8 text-xs bg-white text-gray-700 hover:bg-green-50 hover:text-green-700 hover:border-green-200" onClick={() => handleResolve(note.id)}>
+                                                                <CheckCircle2 className="h-4 w-4 mr-1 text-green-600" /> 確認
                                                             </Button>
                                                         </div>
                                                     </div>
@@ -208,9 +208,9 @@ export function NotificationWidget() {
                     />
 
                     {resolvedNotifications.length === 0 ? (
-                        <Card>
+                        <Card className="rounded-2xl border-gray-200 shadow-none bg-white mt-4">
                             <CardContent>
-                                <div className="text-gray-400 text-sm py-8 text-center">
+                                <div className="text-[#a09a95] text-sm py-12 text-center">
                                     確認済みの連絡はありません
                                 </div>
                             </CardContent>
@@ -218,7 +218,7 @@ export function NotificationWidget() {
                     ) : (
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                             {Object.entries(groupedResolved).map(([facilityName, notes]) => (
-                                <Card key={facilityName} className="overflow-hidden border-t-4 border-t-gray-300">
+                                <Card key={facilityName} className="overflow-hidden rounded-2xl border-gray-200">
                                     <CardHeader className="bg-gray-50/50 py-3 px-4 flex flex-row items-center justify-between space-y-0">
                                         <div className="font-bold flex items-center gap-2 text-gray-600">{facilityName}</div>
                                     </CardHeader>

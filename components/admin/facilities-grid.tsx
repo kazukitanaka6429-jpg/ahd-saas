@@ -21,14 +21,14 @@ export function FacilitiesGrid({ data }: { data: Facility[] }) {
 
 
     return (
-        <div className="border rounded-md">
+        <div className="border border-gray-200 rounded-2xl bg-white shadow-sm overflow-hidden">
             <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>施設名</TableHead>
-                        <TableHead>施設コード</TableHead>
-                        <TableHead>事業所番号</TableHead>
-                        <TableHead className="w-[100px]">操作</TableHead>
+                <TableHeader className="bg-[#Fdfbf9]">
+                    <TableRow className="hover:bg-transparent">
+                        <TableHead className="font-bold text-gray-700 h-12">施設名</TableHead>
+                        <TableHead className="font-bold text-gray-700 h-12">施設コード</TableHead>
+                        <TableHead className="font-bold text-gray-700 h-12">事業所番号</TableHead>
+                        <TableHead className="w-[100px] font-bold text-gray-700 h-12 text-center">操作</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -40,16 +40,16 @@ export function FacilitiesGrid({ data }: { data: Facility[] }) {
                         </TableRow>
                     ) : (
                         data.map((item) => (
-                            <TableRow key={item.id}>
-                                <TableCell className="font-medium">{item.name}</TableCell>
-                                <TableCell>{item.code}</TableCell>
-                                <TableCell>{item.provider_number || '-'}</TableCell>
-                                <TableCell>
-                                    <div className="flex items-center gap-2">
+                            <TableRow key={item.id} className="hover:bg-gray-50/50 transition-colors">
+                                <TableCell className="font-medium text-gray-800 h-14">{item.name}</TableCell>
+                                <TableCell className="text-gray-600 h-14">{item.code}</TableCell>
+                                <TableCell className="text-gray-600 h-14">{item.provider_number || '-'}</TableCell>
+                                <TableCell className="h-14">
+                                    <div className="flex items-center justify-center gap-2">
                                         <FacilityForm
                                             initialData={item}
                                             trigger={
-                                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                <Button variant="ghost" size="icon" className="h-9 w-9 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded-xl transition-colors">
                                                     <Pencil className="h-4 w-4" />
                                                 </Button>
                                             }
@@ -59,7 +59,7 @@ export function FacilitiesGrid({ data }: { data: Facility[] }) {
                                             onDelete={deleteFacility}
                                             iconOnly
                                             confirmMessage={`施設「${item.name}」を削除してもよろしいですか？\nこの操作は取り消せません。`}
-                                            className="h-8 w-8 text-destructive hover:text-destructive"
+                                            className="h-9 w-9 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition-colors"
                                         />
                                     </div>
                                 </TableCell>

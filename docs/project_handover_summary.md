@@ -1,72 +1,67 @@
 # プロジェクト引き継ぎ用サマリー (Handover Summary)
 
-## 1. 直近の対応状況 (Recent Context)
-現在、**「人員配置表（監査機能）」** の実装を進めている段階です。
-特に、**「手入力データの保存エラー」** と **「CSVインポート時のサイズ制限エラー」** の解決に取り組んでいました。
+**最終更新日**: 2026年2月12日
+**フェーズ**: Phase 2 (Reliability/Security) & Phase 3 (HQ Dashboard) 完了
 
-### ✅ 解決済みの問題
-1. **マニュアル監査データの保存エラー解決**
-   - **症状**: `manual_work_records` テーブルが見つからないエラーが発生。
-   - **対応**: Supabase上で手動SQLを実行し、テーブル作成とRLS（権限）設定を完了しました。
-   - **現状**: データベース側の準備は完了しており、正常に保存できる状態です。
+## 1. 納品物の概要 (Deliverables)
 
-2. **開発サーバー起動トラブル解決**
-   - **症状**: `npm run dev` が `package.json` が見つからず起動しない。
-   - **対応**: 実行ディレクトリが `playground` 直下だったため、正しいディレクトリ `playground\infrared-rocket` へ移動するよう案内しました。
+本期間において、事業価値（Valuation）を最大化するための「技術的信頼性」「セキュリティ」「経営管理機能」の実装が完了しました。
 
-3. **CSVインポート時の容量制限 (Body exceeded 1 MB limit)**
-   - **症状**: 訪問看護CSVなどの大きなファイルをアップロードするとエラーになる。
-   - **対応**: `next.config.ts` に `serverActions: { bodySizeLimit: '5mb' }` を設定し、制限を5MBに緩和しました。
-   - **注意**: 設定ファイルの構文エラーも修正済みですが、**サーバー再起動が必要**な状態です。
+### A. 経営管理ダッシュボード (HQ Dashboard)
+- **URL**: `/hq/dashboard`
+- **主要機能**:
+  - **KPI可視化**: 「配置充足率」「欠員率」「加算未取得率」などの重要指標をリアルタイム算出。
+  - **アラートシステム**: 法令違反や書類不備のリスクがある施設を「信号機カラー」で警告。
+  - **ベンチマーク**: 全施設のパフォーマンス（残業時間など）を横並びで比較可能に。
 
----
+### B. 技術的信頼性 (Reliability & Testing)
+- **テスト基盤**: Jest によるユニットテスト環境を構築。
+- **カバレッジ**:
+  - `lib/audit/calculator.ts`: 人員基準・加算算定ロジック（テスト済）
+  - `actions/medical-cooperation.ts`: 医療連携体制加算IVロジック（テスト済）
+  - `daily-records`: 入力バリデーション（テスト済）
+- **CI/CD**: `test_coverage_report.md` にて品質を継続監視可能。
 
-## 2. 次のアクション (Next Steps)
-
-### 優先度高: 動作確認
-アカウント切り替え後は、まず以下の手順で環境を復旧し、動作確認を行ってください。
-
-1. **ディレクトリ移動**
-   ```powershell
-   cd c:\Users\ktana\.gemini\antigravity\playground\infrared-rocket
-   ```
-
-2. **サーバー起動（再起動）**
-   - `next.config.ts` の変更を反映させるため、必ず再起動してください。
-   ```powershell
-   npm run dev
-   ```
-
-3. **CSVインポートのテスト**
-   - 以前エラーになった訪問看護などのCSVファイルをアップロードし、エラーが出ないことを確認してください。
-
-### 進行中のタスク: 人員配置表の実装
-以下のドキュメントに基づき、人員配置監査機能の実装を継続してください。
-
-- **タスクリスト**: `docs/personnel_audit/task.md`
-- **実装計画書**: `docs/personnel_audit/implementation_plan.md`
+### C. セキュリティ強化 (Security Hardening)
+- **RLS標準化**: `supabase/migrations/20260212_standard_rls.sql` により、`daily_records` へのアクセス制御を `can_access_facility()` 関数に統一。
+- **脱・特権アクセス**: アプリケーションロジック（`fetch.ts` 等）から `createAdminClient` の使用を排除し、情報漏洩リスクを構造的に遮断。
 
 ---
 
-## 3. 技術メモ (Technical Notes)
+## 2. 事業価値評価の向上 (Valuation Update)
 
-### 実行した重要SQL (Supabase)
-`manual_work_records` と `manual_deductions` テーブルを作成済みです。
-```sql
-create table if not exists public.manual_work_records (...);
-create table if not exists public.manual_deductions (...);
--- RLS有効化済み
-alter table public.manual_work_records enable row level security;
-```
+技術的な負債解消と新機能実装により、事業性評価報告書を更新しました。
 
-### 修正した設定ファイル (`next.config.ts`)
-```typescript
-const nextConfig: NextConfig = {
-  experimental: {
-    serverActions: {
-      bodySizeLimit: '5mb', // ここで緩和
-    },
-  },
-  // ...Sentry設定など
-};
+- **最新レポート**: `docs/due_diligence_valuation/business_valuation_report_v2.md`
+- **評価額**: ¥50M-80M → **¥80M-120M** (+60%)
+- **ステータス**: Beta → **Production Ready**
+
+---
+
+## 3. 次のアクション (Next Steps)
+
+### 短期 (Immediate)
+1. **本番環境へのデプロイ**:
+   - SupabaseのMigrationファイル（`supabase/migrations/`）を本番DBに適用。
+   - Vercelへ最新コードをデプロイ。
+2. **初期ユーザーへの案内**:
+   - 新設された「HQダッシュボード」のデモを実施し、経営層へのレポーティングを開始。
+
+### 中長期 (Future Roadmap)
+- **月次レポートのエクスポート**: 現在は画面表示のみ。PDF/CSV出力機能を実装することで、事務工数をさらに削減可能。
+- **AI予実管理**: 過去のシフトデータから、来月の欠員リスクを予測する機能（Phase 4検討項目）。
+
+---
+
+## 4. 技術メモ (Technical Notes)
+
+### 重要な変更点
+- **`lib/analytics/`**: 新設。KPI計算や集計ロジックを集約。
+- **`components/hq/dashboard/`**: 新設。ダッシュボードUIコンポーネント。
+- **RLSポリシー**: `daily_records` テーブル群は `organization_id` ではなく `facility_id` ベースの制御（`can_access_facility`）に変更されています。
+
+### 実行が必要なコマンド (開発環境復旧時)
+```powershell
+npm install # recharts 等の新規依存関係
+npm run dev
 ```

@@ -228,9 +228,9 @@ export function ShortStayGrid({ residents, record: initialRecord, date, facility
 
     // Helper for cells
     const inputCellBase = "bg-white h-full" // Changed from bg-[#d9ead3] to bg-white
-    const checkboxClass = "w-5 h-5 accent-green-600 cursor-pointer"
-    const headerBase = "border border-black text-black font-bold text-center h-auto py-1 bg-gray-100 p-0 align-middle"
-    const cellBase = "border border-black p-0 text-center align-middle relative"
+    const checkboxClass = "w-5 h-5 accent-orange-600 cursor-pointer"
+    const headerBase = "border border-gray-200 text-gray-700 font-bold text-center h-auto py-1 bg-[#Fdfbf9] p-0 align-middle"
+    const cellBase = "border border-gray-200 p-0 text-center align-middle relative"
 
     const FindingCell = ({ colKey, children, className = "", label }: { colKey: string, children: React.ReactNode, className?: string, label: string }) => {
         const show = hasFinding(colKey)
@@ -277,20 +277,20 @@ export function ShortStayGrid({ residents, record: initialRecord, date, facility
     }
 
     return (
-        <div className="rounded-md border bg-white overflow-hidden shadow-sm mt-8">
-            <div className="px-4 py-2 border-b flex justify-between items-center bg-gray-50 border-black border-l-0 border-r-0 border-t-0">
-                <div className="text-sm font-bold flex items-center gap-2">
-                    <span className="w-2 h-2 bg-black mr-1"></span>
+        <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden shadow-sm mt-8">
+            <div className="px-4 py-3 border-b flex justify-between items-center bg-white border-gray-200">
+                <div className="text-base font-bold text-gray-800 flex items-center gap-2">
+                    <span className="w-1.5 h-4 bg-orange-500 rounded-full mr-1"></span>
                     ショートステイ利用
                 </div>
-                <div className="text-xs text-gray-500">※同日のショート利用は1人まで</div>
-                <div className="flex gap-2">
+                <div className="text-xs text-gray-500 mt-1">※同日のショート利用は1人まで</div>
+                <div className="flex gap-3">
                     {formData.id && (
-                        <Button onClick={onDelete} disabled={isDeleting} variant="destructive" className="h-8 font-bold">
+                        <Button onClick={onDelete} disabled={isDeleting} variant="destructive" className="h-9 px-4 rounded-xl font-bold shadow-sm">
                             <Trash2 className="w-4 h-4 mr-2" />削除
                         </Button>
                     )}
-                    <Button onClick={onManualSave} disabled={isGlobalSaving} className="h-8 bg-green-600 hover:bg-green-700 text-white font-bold">
+                    <Button onClick={onManualSave} disabled={isGlobalSaving} className="h-9 px-5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold transition-all shadow-sm">
                         {isGlobalSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                         保存
                     </Button>
@@ -298,7 +298,7 @@ export function ShortStayGrid({ residents, record: initialRecord, date, facility
             </div>
 
             <div className="overflow-x-auto">
-                <Table className="min-w-[1000px] border-collapse border border-black text-sm w-full">
+                <Table className="min-w-[1000px] border-collapse border border-gray-200 text-sm w-full">
                     <TableHeader>
                         {/* Header Structure (Same as before) */}
                         <TableRow className="h-[40px]">
@@ -309,7 +309,7 @@ export function ShortStayGrid({ residents, record: initialRecord, date, facility
                                 </div>
                             </TableHead>
                             <TableHead className={cn(cellBase, headerBase)} colSpan={3}>
-                                <div className="border-b border-black py-1">食事</div>
+                                <div className="border-b border-gray-200 py-1">食事</div>
                                 <div className="text-[10px] text-red-600 font-normal">バランス弁当提供</div>
                             </TableHead>
                             <TableHead className={cn(cellBase, headerBase)} colSpan={3}>
@@ -322,31 +322,31 @@ export function ShortStayGrid({ residents, record: initialRecord, date, facility
                                 </div>
                             </TableHead>
                             <TableHead className={cn(cellBase, headerBase, "w-[120px]")} colSpan={2}>
-                                <div className="border-b border-black py-1">入退去時間 <span className="text-red-500 text-xs">(入退去日の場合必須)</span></div>
+                                <div className="border-b border-gray-200 py-1">入退去時間 <span className="text-red-500 text-xs">(入退去日の場合必須)</span></div>
                             </TableHead>
                             <TableHead className={cn(cellBase, headerBase, "w-[60px]")} rowSpan={2}>
                                 <div className="flex flex-col justify-center h-full gap-1">
                                     <div className="text-[10px] leading-tight">食事提供有<br />(経管含む)</div>
-                                    <div className="border-t border-black w-full pt-1">昼食</div>
+                                    <div className="border-t border-gray-200 w-full pt-1">昼食</div>
                                 </div>
                             </TableHead>
                         </TableRow>
 
                         {/* Sub Header */}
                         <TableRow className="h-[30px]">
-                            <TableHead className={cn(cellBase, headerBase, "w-[40px] bg-gray-50")}>朝</TableHead>
-                            <TableHead className={cn(cellBase, headerBase, "w-[40px] bg-gray-50")}>昼</TableHead>
-                            <TableHead className={cn(cellBase, headerBase, "w-[40px] bg-gray-50")}>夜</TableHead>
-                            <TableHead className={cn(cellBase, headerBase, "w-[40px] bg-gray-50")}>GH</TableHead>
-                            <TableHead className={cn(cellBase, headerBase, "w-[60px] bg-gray-50")}>日中活動</TableHead>
-                            <TableHead className={cn(cellBase, headerBase, "bg-gray-50")}>その他福祉サービス利用</TableHead>
-                            <TableHead className={cn(cellBase, headerBase, "w-[60px] bg-gray-50")}>GH泊</TableHead>
-                            <TableHead className={cn(cellBase, headerBase, "bg-gray-50")}>入居時刻</TableHead>
-                            <TableHead className={cn(cellBase, headerBase, "bg-gray-50")}>退居時刻</TableHead>
+                            <TableHead className={cn(cellBase, headerBase, "w-[40px]")}>朝</TableHead>
+                            <TableHead className={cn(cellBase, headerBase, "w-[40px]")}>昼</TableHead>
+                            <TableHead className={cn(cellBase, headerBase, "w-[40px]")}>夜</TableHead>
+                            <TableHead className={cn(cellBase, headerBase, "w-[40px]")}>GH</TableHead>
+                            <TableHead className={cn(cellBase, headerBase, "w-[60px]")}>日中活動</TableHead>
+                            <TableHead className={cn(cellBase, headerBase)}>その他福祉サービス利用</TableHead>
+                            <TableHead className={cn(cellBase, headerBase, "w-[60px]")}>GH泊</TableHead>
+                            <TableHead className={cn(cellBase, headerBase)}>入居時刻</TableHead>
+                            <TableHead className={cn(cellBase, headerBase)}>退居時刻</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        <TableRow className="h-[60px] border-b border-black">
+                        <TableRow className="h-[60px] border-b border-gray-200">
                             {/* Resident / Period */}
                             <TableCell className={cn(cellBase, "bg-white align-top p-1")}>
                                 <div className="flex flex-col gap-1 h-full justify-center">

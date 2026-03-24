@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentStaff } from '@/lib/auth-helpers'
 import { protect } from '@/lib/auth-guard'
+import { logOperation } from '@/lib/operation-logger'
 import { logger } from '@/lib/logger'
 import { revalidatePath } from 'next/cache'
 
@@ -35,13 +36,27 @@ export async function upsertManualWork(data: {
             payload.id = data.id
         }
 
-        const { error } = await supabase
+        const { data: inserted, error } = await supabase
             .from('manual_work_records')
             .upsert(payload)
+            .select()
+            .single()
 
         if (error) {
             console.error('Supabase Error Details:', JSON.stringify(error, null, 2))
             throw error
+        }
+
+        // Audit Log
+        if (inserted) {
+            logOperation({
+                organizationId: staff.organization_id,
+                actorId: staff.id,
+                targetResource: 'manual_record',
+                actionType: data.id ? 'UPDATE' : 'CREATE',
+                targetId: inserted.id,
+                details: { ...payload, facilityId: staff.facility_id }
+            })
         }
 
         revalidatePath('/audit/personnel')
@@ -55,6 +70,9 @@ export async function upsertManualWork(data: {
 export async function deleteManualWork(id: string) {
     try {
         await protect()
+        const staff = await getCurrentStaff()
+        if (!staff) return { error: 'Unauthorized' }
+
         const supabase = await createClient()
 
         const { error } = await supabase
@@ -63,6 +81,15 @@ export async function deleteManualWork(id: string) {
             .eq('id', id)
 
         if (error) throw error
+
+        logOperation({
+            organizationId: staff.organization_id,
+            actorId: staff.id,
+            targetResource: 'manual_record',
+            actionType: 'DELETE',
+            targetId: id,
+            details: { facilityId: staff.facility_id }
+        })
 
         revalidatePath('/audit/personnel')
         return { success: true }
@@ -100,11 +127,24 @@ export async function upsertManualDeduction(data: {
             payload.id = data.id
         }
 
-        const { error } = await supabase
+        const { data: inserted, error } = await supabase
             .from('manual_deductions')
             .upsert(payload)
+            .select()
+            .single()
 
         if (error) throw error
+
+        if (inserted) {
+            logOperation({
+                organizationId: staff.organization_id,
+                actorId: staff.id,
+                targetResource: 'manual_deduction',
+                actionType: data.id ? 'UPDATE' : 'CREATE',
+                targetId: inserted.id,
+                details: { ...payload, facilityId: staff.facility_id }
+            })
+        }
 
         revalidatePath('/audit/personnel')
         return { success: true }
@@ -117,6 +157,9 @@ export async function upsertManualDeduction(data: {
 export async function deleteManualDeduction(id: string) {
     try {
         await protect()
+        const staff = await getCurrentStaff()
+        if (!staff) return { error: 'Unauthorized' }
+
         const supabase = await createClient()
 
         const { error } = await supabase
@@ -125,6 +168,15 @@ export async function deleteManualDeduction(id: string) {
             .eq('id', id)
 
         if (error) throw error
+
+        logOperation({
+            organizationId: staff.organization_id,
+            actorId: staff.id,
+            targetResource: 'manual_deduction',
+            actionType: 'DELETE',
+            targetId: id,
+            details: { facilityId: staff.facility_id }
+        })
 
         revalidatePath('/audit/personnel')
         return { success: true }

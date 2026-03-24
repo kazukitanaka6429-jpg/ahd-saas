@@ -100,7 +100,7 @@ export function Sidebar({ role, facilityName, hasMultipleAccounts }: { role?: st
     return (
         <div
             className={cn(
-                "relative flex h-full flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground py-8 transition-all duration-300 ease-in-out",
+                "relative flex h-full flex-col border-r border-gray-200 bg-[#FCFAF6] text-[#5C4D43] py-8 transition-all duration-300 ease-in-out",
                 isCollapsed ? "w-20 px-2" : "w-64 px-4"
             )}
         >
@@ -122,8 +122,11 @@ export function Sidebar({ role, facilityName, hasMultipleAccounts }: { role?: st
             {!isCollapsed && (
                 /* Role Badge */
                 <div className="flex justify-center mb-4">
-                    <div className="text-xs text-sidebar-foreground/60 border border-sidebar-border rounded px-2 py-0.5 whitespace-nowrap bg-sidebar/50">
-                        {role === 'admin' ? '本社' : role === 'manager' ? '管理者' : '一般'}
+                    <div className="flex items-center gap-2 mt-2">
+                        <div className="text-[10px] text-[#5C4D43]/60 border border-[#5C4D43]/20 rounded px-1.5 py-0.5 whitespace-nowrap bg-white/50">
+                            {role === 'admin' ? '本社' : role === 'manager' ? '管理者' : '一般'}
+                        </div>
+                        <span className="text-xs truncate max-w-[120px] font-medium">{facilityName}</span>
                     </div>
                 </div>
             )}
@@ -154,12 +157,12 @@ export function Sidebar({ role, facilityName, hasMultipleAccounts }: { role?: st
                                     key={child.href}
                                     href={child.href!}
                                     title={child.title}
-                                    className={cn(
-                                        'flex items-center gap-3 rounded-lg py-2 text-sm font-medium transition-colors justify-center px-0',
-                                        pathname === child.href
-                                            ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                                            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
-                                    )}
+                                className={cn(
+                                    'flex items-center gap-3 rounded-xl py-3 text-sm font-medium transition-colors justify-center px-0',
+                                    pathname === child.href
+                                        ? 'bg-orange-50 text-orange-600 shadow-sm'
+                                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900',
+                                )}
                                 >
                                     <child.icon className="h-4 w-4 shrink-0" />
                                 </Link>
@@ -177,7 +180,7 @@ export function Sidebar({ role, facilityName, hasMultipleAccounts }: { role?: st
                                     <Button
                                         variant="ghost"
                                         className={cn(
-                                            "w-full justify-between hover:bg-sidebar-accent hover:text-sidebar-foreground px-3 py-2 h-auto font-normal text-sidebar-foreground/70",
+                                            "w-full justify-between hover:bg-[#F2EAE1] hover:text-[#5C4D43] px-3 py-3 h-auto font-medium text-[#7A6A60] rounded-xl transition-colors",
                                             isCollapsed ? "hidden" : "flex"
                                         )}
                                     >
@@ -193,12 +196,12 @@ export function Sidebar({ role, facilityName, hasMultipleAccounts }: { role?: st
                                         <Link
                                             key={child.href}
                                             href={child.href!}
-                                            className={cn(
-                                                'flex items-center gap-3 rounded-lg py-2 pl-9 text-sm font-medium transition-colors',
-                                                pathname === child.href
-                                                    ? 'bg-sidebar-primary/10 text-sidebar-primary' // サブメニューのアクティブスタイル
-                                                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
-                                            )}
+                                                className={cn(
+                                                    'flex items-center gap-3 rounded-r-full py-3.5 pl-10 text-sm font-medium transition-colors my-0.5 relative -left-4 w-[calc(100%+16px)] pr-4',
+                                                    pathname === child.href
+                                                        ? 'bg-[#CB725A] text-white shadow-sm'
+                                                        : 'text-[#7A6A60] hover:bg-[#F2EAE1] hover:text-[#5C4D43]'
+                                                )}
                                         >
                                             <child.icon className="h-4 w-4 shrink-0" />
                                             <span className="truncate">{child.title}</span>
@@ -216,11 +219,11 @@ export function Sidebar({ role, facilityName, hasMultipleAccounts }: { role?: st
                             href={item.href!}
                             title={isCollapsed ? item.title : undefined}
                             className={cn(
-                                'flex items-center gap-3 rounded-lg py-2 text-sm font-medium transition-colors',
+                                'flex items-center gap-3 rounded-xl py-3 text-sm font-medium transition-colors',
                                 pathname === item.href
-                                    ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
-                                isCollapsed ? 'justify-center px-0' : 'px-3'
+                                    ? 'bg-orange-50 text-orange-600 shadow-sm'
+                                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900',
+                                isCollapsed ? 'justify-center px-0' : 'px-4'
                             )}
                         >
                             <item.icon className="h-4 w-4 shrink-0" />
@@ -245,8 +248,8 @@ export function Sidebar({ role, facilityName, hasMultipleAccounts }: { role?: st
                 <Button
                     variant="ghost"
                     className={cn(
-                        "w-full gap-3 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-red-500",
-                        isCollapsed ? "justify-center p-0" : "justify-start"
+                        "w-full justify-start gap-3 text-[#7A6A60] hover:bg-red-50 hover:text-red-600 rounded-xl py-3 h-auto font-medium transition-colors px-4",
+                        isCollapsed ? "justify-center p-0" : "justify-start px-4"
                     )}
                     onClick={handleLogout}
                     title={isCollapsed ? "ログアウト" : undefined}

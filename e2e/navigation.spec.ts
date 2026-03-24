@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe('navigation', () => {
     // Note: These tests assume a logged-in state or public pages.
     // Since login is guarded, we can only test the redirection to login for now.

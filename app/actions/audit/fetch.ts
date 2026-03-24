@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+
 import { protect } from '@/lib/auth-guard'
 import { fetchAuditData, calculateAudit, AuditResult, AuditData } from '@/lib/audit/calculator'
 import { format } from 'date-fns'
@@ -24,14 +24,14 @@ export async function getAuditPageData(dateStr?: string, facilityIdOverride?: st
     try {
         await protect()
 
-        // Use Admin Client to bypass potential RLS issues for staff lookup.
-        // We already verified session existence with protect().
-        const supabaseAdmin = createAdminClient()
-        const { data: { user } } = await (await createClient()).auth.getUser()
+        // Use Standard Client (RLS Protected)
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
 
         if (!user) return { error: 'Unauthorized: No User' }
 
-        const { data: staff } = await supabaseAdmin
+        // Fetch staff info using standard client (RLS should allow reading own record)
+        const { data: staff } = await supabase
             .from('staffs')
             .select('*')
             .eq('auth_user_id', user.id)
@@ -41,7 +41,7 @@ export async function getAuditPageData(dateStr?: string, facilityIdOverride?: st
             return { error: 'Unauthorized: Staff Link Missing' }
         }
 
-        // Determine facility ID: override > cookie (for admin) > staff's facility
+        // Determine facility ID
         let facilityId = staff.facility_id
 
         if (staff.role === 'admin') {
@@ -49,6 +49,10 @@ export async function getAuditPageData(dateStr?: string, facilityIdOverride?: st
             const facilityIdFromCookie = cookieStore.get('selected_facility_id')?.value
             facilityId = facilityIdOverride || facilityIdFromCookie || staff.facility_id
         } else if (facilityIdOverride) {
+            // Validate if non-admin user is trying to access other facility
+            // RLS will block the actual data fetch, but good to check here too or just let RLS fail?
+            // "can_access_facility" logic in DB handles this, so we can technically rely on RLS.
+            // But let's keep the override logic simple for now.
             facilityId = facilityIdOverride
         }
 
@@ -56,12 +60,12 @@ export async function getAuditPageData(dateStr?: string, facilityIdOverride?: st
 
         const targetDate = dateStr || format(new Date(), 'yyyy-MM-dd')
 
-        // 1. Fetch Audit Data & Calculate
-        const rawData = await fetchAuditData(targetDate, facilityId)
+        // 1. Fetch Audit Data & Calculate (Pass the RLS-protected client)
+        const rawData = await fetchAuditData(targetDate, facilityId, supabase)
         const auditResult = calculateAudit(rawData)
 
-        // 2. Fetch Active Staff List for Dialogs (filtered by selected facility)
-        const { data: staffList } = await supabaseAdmin
+        // 2. Fetch Active Staff List for Dialogs
+        const { data: staffList } = await supabase
             .from('staffs')
             .select('id, name')
             .eq('facility_id', facilityId)

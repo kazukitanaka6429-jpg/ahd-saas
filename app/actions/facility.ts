@@ -7,6 +7,8 @@ import { protect } from '@/lib/auth-guard'
 import { logger } from '@/lib/logger'
 import { translateError } from '@/lib/error-translator'
 
+import { logOperation } from '@/lib/operation-logger'
+
 export async function getFacilities() {
     try {
         await protect()
@@ -50,7 +52,7 @@ export async function createFacility(data: {
 
         const supabase = await createClient()
 
-        const { error } = await supabase
+        const { data: newFacility, error } = await supabase
             .from('facilities')
             .insert({
                 organization_id: currentStaff.organization_id, // Inherit Org
@@ -59,12 +61,24 @@ export async function createFacility(data: {
                 provider_number: data.provider_number || null,
                 settings: data.settings || {}
             })
+            .select() // Select to get ID
+            .single()
 
         if (error) {
             logger.error('createFacility failed', error)
             if (error.code === '23505') return { error: '施設コードが既に存在します' }
             return { error: translateError(error.message) }
         }
+
+        // Audit Log
+        logOperation({
+            organizationId: currentStaff.organization_id,
+            actorId: currentStaff.id,
+            targetResource: 'facility',
+            actionType: 'CREATE',
+            targetId: newFacility.id,
+            details: { name: data.name, code: data.code }
+        })
 
         revalidatePath('/facilities') // Adjust path as needed
         revalidatePath('/settings/facilities')
@@ -108,6 +122,16 @@ export async function updateFacility(id: string, data: {
             return { error: translateError(error.message) }
         }
 
+        // Audit Log
+        logOperation({
+            organizationId: currentStaff.organization_id,
+            actorId: currentStaff.id,
+            targetResource: 'facility',
+            actionType: 'UPDATE',
+            targetId: id,
+            details: { name: data.name }
+        })
+
         revalidatePath('/facilities')
         revalidatePath('/settings/facilities')
         return { success: true }
@@ -144,6 +168,15 @@ export async function deleteFacility(id: string) {
             logger.error('deleteFacility failed', error)
             return { error: translateError(error.message) }
         }
+
+        // Audit Log
+        logOperation({
+            organizationId: currentStaff.organization_id,
+            actorId: currentStaff.id,
+            targetResource: 'facility',
+            actionType: 'DELETE',
+            targetId: id
+        })
 
         revalidatePath('/facilities')
         revalidatePath('/settings/facilities')

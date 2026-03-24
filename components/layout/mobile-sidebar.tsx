@@ -99,7 +99,7 @@ export function MobileSidebar({ role, facilityName }: { role?: string, facilityN
                                         <CollapsibleTrigger asChild>
                                             <Button
                                                 variant="ghost"
-                                                className="w-full justify-between hover:bg-sidebar-accent hover:text-sidebar-foreground px-3 py-2 h-auto font-normal text-sidebar-foreground/70"
+                                                className="w-full justify-between hover:bg-gray-50 hover:text-gray-900 px-3 py-3 h-auto font-medium text-gray-700 rounded-xl transition-colors"
                                             >
                                                 <div className="flex items-center gap-3">
                                                     <item.icon className="h-4 w-4 shrink-0" />
@@ -114,10 +114,10 @@ export function MobileSidebar({ role, facilityName }: { role?: string, facilityN
                                                     key={child.href}
                                                     href={child.href!}
                                                     className={cn(
-                                                        'flex items-center gap-3 rounded-lg py-2 pl-9 text-sm font-medium transition-colors',
+                                                        'flex items-center gap-3 rounded-xl py-2.5 pl-10 text-sm font-medium transition-colors',
                                                         pathname === child.href
-                                                            ? 'bg-sidebar-primary/10 text-sidebar-primary'
-                                                            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
+                                                            ? 'bg-orange-50 text-orange-600 font-semibold shadow-sm'
+                                                            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
                                                     )}
                                                 >
                                                     <child.icon className="h-4 w-4 shrink-0" />
@@ -134,10 +134,10 @@ export function MobileSidebar({ role, facilityName }: { role?: string, facilityN
                                     key={item.href}
                                     href={item.href!}
                                     className={cn(
-                                        'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                                        'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors',
                                         pathname === item.href
-                                            ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                                            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
+                                            ? 'bg-orange-50 text-orange-600 shadow-sm'
+                                            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
                                     )}
                                 >
                                     <item.icon className="h-4 w-4 shrink-0" />
@@ -150,7 +150,7 @@ export function MobileSidebar({ role, facilityName }: { role?: string, facilityN
                     <div className="mt-auto px-4 pt-4 border-t">
                         <Button
                             variant="ghost"
-                            className="w-full justify-start gap-3 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-red-500"
+                            className="w-full justify-start gap-3 text-gray-500 hover:bg-red-50 hover:text-red-600 rounded-xl py-3 h-auto font-medium transition-colors px-4"
                             onClick={handleLogout}
                         >
                             <LogOut className="h-4 w-4 shrink-0" />

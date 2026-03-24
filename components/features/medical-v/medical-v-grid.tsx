@@ -210,27 +210,27 @@ export function MedicalVGrid({ residents = [], rows: initialRows = [], targetCou
     const allPendingRecordKeys = useMemo(() => Array.from(pendingRecords.keys()), [pendingRecords])
 
     return (
-        <div className="flex flex-col h-full overflow-hidden border rounded-lg bg-white shadow-sm relative filter-drop-shadow">
+        <div className="flex flex-col h-full overflow-hidden border border-gray-200 rounded-2xl bg-white shadow-sm relative">
             {/* Unsaved Changes Warning Banner */}
             {isDirty && (
-                <Alert variant="destructive" className="rounded-none border-x-0 border-t-0 bg-amber-50 border-amber-200">
-                    <AlertTriangle className="h-5 w-5 text-amber-600" />
-                    <AlertDescription className="text-base font-medium text-amber-800">
+                <Alert variant="destructive" className="rounded-none border-x-0 border-t-0 bg-orange-50 border-orange-200">
+                    <AlertTriangle className="h-5 w-5 text-orange-600" />
+                    <AlertDescription className="text-base font-medium text-orange-800">
                         ⚠️ 保存されていない変更があります。「保存」ボタンを押してください。
                     </AlertDescription>
                 </Alert>
             )}
 
             {/* Header with Summary & Save */}
-            <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex justify-between items-center shrink-0">
+            <div className="bg-white border-b border-gray-200 px-5 py-4 flex justify-between items-center shrink-0">
                 <div className="flex gap-8 items-center">
                     <div className="flex flex-col items-center">
-                        <span className="text-sm font-bold text-slate-500">当月喀痰吸引が必要な利用者数</span>
-                        <span className="text-2xl font-bold text-slate-800">{targetCount}名</span>
+                        <span className="text-sm font-bold text-gray-500">当月喀痰吸引が必要な利用者数</span>
+                        <span className="text-2xl font-bold text-gray-800">{targetCount}名</span>
                     </div>
                     <div className="flex flex-col items-center">
-                        <span className="text-sm font-bold text-slate-500">当月合計単位数</span>
-                        <span className="text-2xl font-bold text-blue-600">{monthlyTotals.totalUnits.toLocaleString()}</span>
+                        <span className="text-sm font-bold text-gray-500">当月合計単位数</span>
+                        <span className="text-2xl font-bold text-orange-600">{monthlyTotals.totalUnits.toLocaleString()}</span>
                     </div>
                 </div>
 
@@ -238,9 +238,9 @@ export function MedicalVGrid({ residents = [], rows: initialRows = [], targetCou
                     onClick={onSave}
                     disabled={!isDirty || isSaving}
                     size="lg"
-                    className={`font-bold text-lg px-6 py-3 h-auto transition-all ${isDirty
-                        ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-md'
-                        : 'bg-slate-600 hover:bg-slate-700 text-white'}`}
+                    className={`font-bold text-lg px-6 py-3 h-auto rounded-xl transition-all ${isDirty
+                        ? 'bg-orange-600 hover:bg-orange-700 text-white shadow-md'
+                        : 'bg-gray-400 hover:bg-gray-500 text-white'}`}
                 >
                     {isSaving ? (
                         <>
@@ -302,22 +302,22 @@ export function MedicalVGrid({ residents = [], rows: initialRows = [], targetCou
             {/* Main Table */}
             <div className="overflow-auto flex-1">
                 <Table className="min-w-max border-separate border-spacing-0">
-                    <TableHeader className="sticky top-0 bg-slate-100 z-30 shadow-sm">
+                    <TableHeader className="sticky top-0 bg-[#Fdfbf9] z-30 shadow-sm">
                         <TableRow className="h-20">
-                            <TableHead className="w-[100px] min-w-[100px] bg-slate-200 sticky left-0 z-30 border-r border-b text-center align-middle font-bold text-base text-slate-800">
+                            <TableHead className="w-[100px] min-w-[100px] bg-gray-100 sticky left-0 z-30 border-r border-gray-200 border-b text-center align-middle font-bold text-base text-gray-800">
                                 指導日
                             </TableHead>
-                            <TableHead className="w-[100px] min-w-[100px] bg-slate-200 sticky left-[100px] z-30 border-r border-b text-center align-middle font-bold text-base text-slate-800">
+                            <TableHead className="w-[100px] min-w-[100px] bg-gray-100 sticky left-[100px] z-30 border-r border-gray-200 border-b text-center align-middle font-bold text-base text-gray-800">
                                 指導<br />看護師数
                             </TableHead>
-                            <TableHead className="w-[100px] min-w-[100px] bg-slate-200 sticky left-[200px] z-30 border-r border-b text-center align-middle font-bold text-base text-slate-800">
+                            <TableHead className="w-[100px] min-w-[100px] bg-gray-100 sticky left-[200px] z-30 border-r border-gray-200 border-b text-center align-middle font-bold text-base text-gray-800">
                                 当日の<br />単位数
                             </TableHead>
                             {filteredResidents?.map((r, i) => {
                                 const unitName = units.find(u => u.id === r.unit_id)?.name
                                 return (
-                                    <TableHead key={r.id} className="w-[70px] min-w-[70px] bg-slate-100 border-r border-b text-center align-bottom p-1 text-sm text-slate-800 font-normal relative">
-                                        <div className="absolute top-1 left-1 text-xs text-slate-400 font-bold">{i + 1}</div>
+                                    <TableHead key={r.id} className="w-[70px] min-w-[70px] bg-[#Fdfbf9] border-r border-gray-200 border-b text-center align-bottom p-1 text-sm text-gray-800 font-normal relative">
+                                        <div className="absolute top-1 left-1 text-xs text-gray-400 font-bold">{i + 1}</div>
                                         <div className="writing-mode-vertical-rl h-16 w-full flex items-center justify-center mx-auto whitespace-nowrap font-medium gap-1">
                                             <span>{r.name}</span>
                                             {selectedUnitId === 'all' && unitName && (
@@ -357,19 +357,19 @@ export function MedicalVGrid({ residents = [], rows: initialRows = [], targetCou
                         })}
                     </TableBody>
                     {/* Monthly Summary Footer */}
-                    <TableFooter className="sticky bottom-0 z-20 bg-slate-50 border-t-2 border-slate-300">
-                        <TableRow className="h-12 bg-slate-50 hover:bg-slate-50">
-                            <TableCell className="sticky left-0 z-20 border-r bg-slate-100 text-center font-bold text-base text-slate-800">
+                    <TableFooter className="sticky bottom-0 z-20 bg-gray-50 border-t-2 border-gray-300">
+                        <TableRow className="h-12 bg-gray-50 hover:bg-gray-50">
+                            <TableCell className="sticky left-0 z-20 border-r border-gray-200 bg-gray-100 text-center font-bold text-base text-gray-800">
                                 月間合計
                             </TableCell>
-                            <TableCell className="sticky left-[100px] z-20 border-r bg-slate-100 text-center font-bold text-lg text-slate-800">
+                            <TableCell className="sticky left-[100px] z-20 border-r border-gray-200 bg-gray-100 text-center font-bold text-lg text-gray-800">
                                 {monthlyTotals.totalNurses}
                             </TableCell>
-                            <TableCell className="sticky left-[200px] z-20 border-r bg-slate-100 text-center font-bold text-lg text-blue-600">
+                            <TableCell className="sticky left-[200px] z-20 border-r border-gray-200 bg-gray-100 text-center font-bold text-lg text-orange-600">
                                 {monthlyTotals.totalUnits.toLocaleString()}
                             </TableCell>
                             {filteredResidents?.map(r => (
-                                <TableCell key={r.id} className="text-center font-bold text-sm bg-slate-50 border-r text-slate-700">
+                                <TableCell key={r.id} className="text-center font-bold text-sm bg-gray-50 border-r border-gray-200 text-gray-700">
                                     {monthlyTotals.residentCounts[r.id] || 0}
                                 </TableCell>
                             ))}

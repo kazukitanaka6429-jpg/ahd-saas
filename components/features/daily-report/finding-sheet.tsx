@@ -10,7 +10,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { useState, useEffect, useTransition } from "react"
+import { useState, useEffect, useTransition, useCallback } from "react"
 import { getFindingComments, addFindingComment, toggleFindingResolved } from "@/app/actions/findings"
 import { FindingComment } from "@/types"
 import { toast } from "sonner"
@@ -31,19 +31,19 @@ export function FindingSheet({ isOpen, onClose, recordId, jsonPath, label, recor
     const [isPending, startTransition] = useTransition()
     const [isLoading, setIsLoading] = useState(false)
 
-    useEffect(() => {
-        if (isOpen && recordId && jsonPath) {
-            loadComments()
-        }
-    }, [isOpen, recordId, jsonPath, recordType])
-
-    const loadComments = async () => {
+    const loadComments = useCallback(async () => {
         if (!recordId || !jsonPath) return
         setIsLoading(true)
         const data = await getFindingComments(recordId, jsonPath, recordType)
         setComments(data)
         setIsLoading(false)
-    }
+    }, [recordId, jsonPath, recordType])
+
+    useEffect(() => {
+        if (isOpen && recordId && jsonPath) {
+            loadComments()
+        }
+    }, [isOpen, recordId, jsonPath, loadComments])
 
     const handleAddComment = async () => {
         if (!newComment.trim() || !recordId || !jsonPath) return

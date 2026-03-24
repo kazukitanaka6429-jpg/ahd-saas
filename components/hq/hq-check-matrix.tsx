@@ -48,23 +48,23 @@ const MatrixTable = ({
     findingsResidentIds?: Set<string>
 }) => {
     return (
-        <div className="overflow-auto flex-1 relative border rounded-md">
+        <div className="overflow-auto flex-1 relative border border-gray-200 rounded-2xl bg-white shadow-sm">
             <table className="border-collapse w-full text-xs min-w-[max-content]">
-                <thead className="bg-gray-100 text-gray-700 sticky top-0 z-20 shadow-sm font-bold">
+                <thead className="bg-[#Fdfbf9] text-gray-700 sticky top-0 z-20 shadow-sm font-bold">
                     <tr>
-                        <th className="border p-2 sticky left-0 z-30 bg-gray-100 w-[120px] min-w-[120px]">施設名</th>
-                        <th className="border p-2 sticky left-[120px] z-30 bg-gray-100 w-[120px] min-w-[120px]">利用者名</th>
-                        <th className="border p-2 sticky left-[240px] z-30 bg-gray-100 w-[100px] min-w-[100px]">項目</th>
+                        <th className="border border-gray-200 p-2 sticky left-0 z-30 bg-gray-100 w-[120px] min-w-[120px]">施設名</th>
+                        <th className="border border-gray-200 p-2 sticky left-[120px] z-30 bg-gray-100 w-[120px] min-w-[120px]">利用者名</th>
+                        <th className="border border-gray-200 p-2 sticky left-[240px] z-30 bg-gray-100 w-[100px] min-w-[100px]">項目</th>
 
                         {days.map(d => (
-                            <th key={d} className="border p-1 w-[35px] min-w-[35px] text-center">
+                            <th key={d} className="border border-gray-200 bg-[#Fdfbf9] p-1 w-[35px] min-w-[35px] text-center">
                                 {d}
                             </th>
                         ))}
 
-                        <th className="border p-2 sticky right-[120px] z-30 bg-gray-100 w-[60px] text-center">SaaS</th>
-                        <th className="border p-2 sticky right-[60px] z-30 bg-gray-100 w-[60px] text-center">CSV</th>
-                        <th className="border p-2 sticky right-0 z-30 bg-gray-100 w-[60px] text-center">判定</th>
+                        <th className="border border-gray-200 p-2 sticky right-[120px] z-30 bg-gray-100 w-[60px] text-center">SaaS</th>
+                        <th className="border border-gray-200 p-2 sticky right-[60px] z-30 bg-gray-100 w-[60px] text-center">CSV</th>
+                        <th className="border border-gray-200 p-2 sticky right-0 z-30 bg-gray-100 w-[60px] text-center">判定</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -79,7 +79,7 @@ const MatrixTable = ({
                             <tr key={`${resident.id}-${row.key}`} className={cn("group transition-colors", rowColors[row.key] || 'bg-white hover:bg-gray-50')}>
                                 {/* Facility Name - Only for first row of this resident */}
                                 {rowIndex === 0 && (
-                                    <td rowSpan={visibleRows.length} className="border p-2 sticky left-0 z-10 bg-white font-medium align-top">
+                                    <td rowSpan={visibleRows.length} className="border border-gray-200 p-2 sticky left-0 z-10 bg-white font-medium align-top">
                                         <div className="writing-mode-vertical-rl h-full flex items-center justify-center text-gray-700 font-bold whitespace-nowrap">
                                             {(resident as any).facilities?.name || "施設不明"}
                                         </div>
@@ -90,7 +90,7 @@ const MatrixTable = ({
                                 {rowIndex === 0 && (
                                     <td
                                         rowSpan={visibleRows.length}
-                                        className="border p-2 sticky left-[120px] z-10 bg-white font-bold align-top border-b-black cursor-pointer hover:bg-blue-50 relative"
+                                        className="border border-gray-200 p-2 sticky left-[120px] z-10 bg-white font-bold align-top border-b-gray-400 cursor-pointer hover:bg-orange-50/50 transition-colors relative"
                                         onContextMenu={(e) => {
                                             e.preventDefault()
                                             onResidentContextMenu?.(e, resident.id, resident.name)
@@ -110,7 +110,7 @@ const MatrixTable = ({
 
                                 {/* Item Label */}
                                 <td className={cn(
-                                    "border p-2 sticky left-[240px] z-10 font-bold text-center border-r-2 border-r-gray-300",
+                                    "border border-gray-200 p-2 sticky left-[240px] z-10 font-bold text-center border-r-2 border-r-gray-300",
                                     rowColors[row.key] || 'bg-gray-50'
                                 )}>
                                     {row.label}
@@ -123,13 +123,13 @@ const MatrixTable = ({
                                         <td
                                             key={dIndex}
                                             className={cn(
-                                                "border p-0 text-center relative transition-opacity",
-                                                isEditing ? "cursor-pointer hover:brightness-95" : "cursor-not-allowed opacity-80"
+                                                "border border-gray-200 p-0 text-center relative transition-opacity",
+                                                isEditing ? "cursor-pointer hover:brightness-95 hover:bg-white" : "cursor-not-allowed opacity-80"
                                             )}
                                             onClick={() => isEditing && onToggle(resident.id, row.key, day, isActive)}
                                         >
                                             {isActive && (
-                                                <div className="w-full h-full flex items-center justify-center text-green-600 font-bold">
+                                                <div className="w-full h-full flex items-center justify-center text-orange-600 font-bold">
                                                     <Check className={cn("w-4 h-4", !isEditing && "text-gray-400")} />
                                                 </div>
                                             )}
@@ -138,15 +138,15 @@ const MatrixTable = ({
                                 })}
 
                                 {/* Totals & Judge */}
-                                <td className="border p-2 sticky right-[120px] z-10 bg-white text-center font-bold border-l-2 border-l-gray-300">
+                                <td className="border border-gray-200 p-2 sticky right-[120px] z-10 bg-white text-center font-bold border-l-2 border-l-gray-300 text-gray-800">
                                     {row.saasCount}
                                 </td>
-                                <td className="border p-2 sticky right-[60px] z-10 bg-white text-center font-medium text-gray-600">
+                                <td className="border border-gray-200 p-2 sticky right-[60px] z-10 bg-white text-center font-medium text-gray-600">
                                     {row.csvCount}
                                 </td>
                                 <td className={cn(
-                                    "border p-2 sticky right-0 z-10 text-center font-bold text-white",
-                                    row.status === 'match' ? 'bg-blue-400' : 'bg-red-500 animate-pulse'
+                                    "border border-gray-200 p-2 sticky right-0 z-10 text-center font-bold text-white",
+                                    row.status === 'match' ? 'bg-orange-400' : 'bg-red-500 animate-pulse'
                                 )}>
                                     {row.status === 'match' ? 'OK' : 'NG'}
                                 </td>
@@ -396,8 +396,8 @@ export function HqCheckMatrix({ data, stayData, year, month }: HqCheckMatrixProp
     }
 
     return (
-        <div className="relative w-full bg-white flex flex-col h-[calc(100vh-200px)]">
-            <div className="p-0 border-b bg-gray-50 flex flex-col shrink-0">
+        <div className="relative w-full bg-white flex flex-col min-h-[500px] border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="p-0 border-b border-gray-200 bg-[#Fdfbf9] flex flex-col shrink-0">
                 <MatrixFilterToolbar
                     facilities={facilities}
                     selectedFacility={selectedFacility}
@@ -411,19 +411,19 @@ export function HqCheckMatrix({ data, stayData, year, month }: HqCheckMatrixProp
                     onToggleColumn={handleToggleColumn}
                     onReset={handleResetFilters}
                 />
-                <div className="p-2 flex justify-between items-center bg-gray-100/50">
+                <div className="p-3 flex justify-between items-center bg-[#Fdfbf9] border-t border-gray-200/50">
                     <div className="flex items-center gap-2">
                         <span className="font-bold text-sm text-gray-700">修正操作:</span>
                         <Button
                             size="sm"
                             variant={isEditing ? "destructive" : "outline"}
                             onClick={() => setIsEditing(!isEditing)}
-                            className={cn("h-8 text-xs font-bold", isEditing && "animate-pulse")}
+                            className={cn("h-8 text-xs font-bold rounded-xl", isEditing && "animate-pulse")}
                         >
                             {isEditing ? '修正モード終了 (Save)' : '🛠️ 修正モードに入る'}
                         </Button>
                         {isEditing && (
-                            <span className="text-xs text-red-500 font-bold bg-white px-2 py-1 border rounded animate-in fade-in">
+                            <span className="text-xs text-red-500 font-bold bg-white px-2 py-1 border border-red-200 rounded-lg shadow-sm animate-in fade-in">
                                 ⚠️ クリックして修正可
                             </span>
                         )}
@@ -431,12 +431,12 @@ export function HqCheckMatrix({ data, stayData, year, month }: HqCheckMatrixProp
                 </div>
             </div>
 
-            <Tabs value={currentTab} onValueChange={handleTabChange} className="flex-1 flex flex-col overflow-hidden">
-                <div className="px-4 py-2 bg-white border-b">
-                    <TabsList>
-                        <TabsTrigger value="daily">業務日誌</TabsTrigger>
-                        <TabsTrigger value="medical">医療連携</TabsTrigger>
-                        <TabsTrigger value="stay">入院・外泊</TabsTrigger>
+            <Tabs value={currentTab} onValueChange={handleTabChange} className="flex-1 flex flex-col overflow-hidden bg-white">
+                <div className="px-5 py-3 bg-white border-b border-gray-200">
+                    <TabsList className="bg-[#F5EBE1] p-1 rounded-xl">
+                        <TabsTrigger value="daily" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-orange-900 data-[state=active]:font-bold transition-all px-4 py-1.5">業務日誌</TabsTrigger>
+                        <TabsTrigger value="medical" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-orange-900 data-[state=active]:font-bold transition-all px-4 py-1.5">医療連携</TabsTrigger>
+                        <TabsTrigger value="stay" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-orange-900 data-[state=active]:font-bold transition-all px-4 py-1.5">入院・外泊</TabsTrigger>
                     </TabsList>
                 </div>
 

@@ -103,16 +103,18 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
+        <div className="space-y-6 pt-6 pb-20 px-6 max-w-[100vw] overflow-hidden">
+            <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-gray-200 pb-4 gap-4">
                 <div>
-                    <h2 className="text-2xl font-bold tracking-tight">利用者マスタ</h2>
-                    <p className="text-muted-foreground">
+                    <h2 className="text-2xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+                        👤 利用者マスタ
+                    </h2>
+                    <p className="text-sm text-gray-500 mt-1">
                         施設を利用する利用者の登録・編集を行います。
                     </p>
                 </div>
                 {/* Only Admin/Manager can add residents usually */}
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-2">
                     {staff.role === 'admin' && (
                         <ResidentFacilityFilter facilities={facilities} />
                     )}
@@ -126,52 +128,52 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
                 </div>
             </div>
 
-            <div className="rounded-md border bg-white overflow-hidden">
+            <div className="border border-gray-200 rounded-2xl bg-white shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                     <Table className="whitespace-nowrap">
-                        <TableHeader>
-                            <TableRow className="bg-gray-50/50">
-                                <TableHead className="min-w-[80px] font-bold text-gray-700">ID</TableHead>
-                                <TableHead className="min-w-[150px] font-bold text-gray-700">氏名</TableHead>
-                                <TableHead>状況</TableHead>
-                                <TableHead>介護度/区分</TableHead>
-                                <TableHead>入居日</TableHead>
-                                <TableHead>主保険</TableHead>
-                                <TableHead>限度額</TableHead>
-                                <TableHead>公費1</TableHead>
-                                <TableHead>公費2</TableHead>
-                                <TableHead className="text-center">別7</TableHead>
-                                <TableHead className="text-center">別8</TableHead>
-                                <TableHead className="text-center">呼吸器</TableHead>
-                                <TableHead className="text-center">重度</TableHead>
-                                <TableHead className="text-center">喀痰</TableHead>
-                                <TableHead className="text-right sticky right-0 bg-white shadow-sm">操作</TableHead>
+                        <TableHeader className="bg-[#Fdfbf9]">
+                            <TableRow className="hover:bg-transparent">
+                                <TableHead className="min-w-[80px] font-bold text-gray-700 h-12">ID</TableHead>
+                                <TableHead className="min-w-[150px] font-bold text-gray-700 h-12">氏名</TableHead>
+                                <TableHead className="font-bold text-gray-700 h-12">状況</TableHead>
+                                <TableHead className="font-bold text-gray-700 h-12">介護度/区分</TableHead>
+                                <TableHead className="font-bold text-gray-700 h-12">入居日</TableHead>
+                                <TableHead className="font-bold text-gray-700 h-12">主保険</TableHead>
+                                <TableHead className="font-bold text-gray-700 h-12">限度額</TableHead>
+                                <TableHead className="font-bold text-gray-700 h-12">公費1</TableHead>
+                                <TableHead className="font-bold text-gray-700 h-12">公費2</TableHead>
+                                <TableHead className="text-center font-bold text-gray-700 h-12">別7</TableHead>
+                                <TableHead className="text-center font-bold text-gray-700 h-12">別8</TableHead>
+                                <TableHead className="text-center font-bold text-gray-700 h-12">呼吸器</TableHead>
+                                <TableHead className="text-center font-bold text-gray-700 h-12">重度</TableHead>
+                                <TableHead className="text-center font-bold text-gray-700 h-12">喀痰</TableHead>
+                                <TableHead className="text-right sticky right-0 bg-[#Fdfbf9] shadow-sm font-bold text-gray-700 h-12">操作</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {residents?.map((resident: Resident) => (
-                                <TableRow key={resident.id}>
-                                    <TableCell className="font-medium sticky left-0 bg-white z-10">{resident.display_id || '-'}</TableCell>
-                                    <TableCell className="font-medium bg-white z-10">
+                                <TableRow key={resident.id} className="hover:bg-gray-50/50 transition-colors">
+                                    <TableCell className="font-medium sticky left-0 bg-white z-10 text-gray-800 h-14">{resident.display_id || '-'}</TableCell>
+                                    <TableCell className="font-medium bg-white z-10 text-gray-800 h-14">
                                         <span className="inline-flex items-center">
                                             {resident.name}
                                             {getAlertIcon(alertLevels[resident.id])}
                                         </span>
                                     </TableCell>
 
-                                    <TableCell>{getStatusLabel(resident.status)}</TableCell>
-                                    <TableCell>{resident.care_level || '-'}</TableCell>
-                                    <TableCell>{resident.start_date}</TableCell>
-                                    <TableCell>{resident.primary_insurance || '-'}</TableCell>
-                                    <TableCell>{resident.limit_application_class || '-'}</TableCell>
-                                    <TableCell>{resident.public_expense_1 || '-'}</TableCell>
-                                    <TableCell>{resident.public_expense_2 || '-'}</TableCell>
-                                    <TableCell className="text-center">{getFlagLabel(resident.table_7)}</TableCell>
-                                    <TableCell className="text-center">{getFlagLabel(resident.table_8)}</TableCell>
-                                    <TableCell className="text-center">{getFlagLabel(resident.ventilator)}</TableCell>
-                                    <TableCell className="text-center">{getFlagLabel(resident.severe_disability_addition)}</TableCell>
-                                    <TableCell className="text-center">{getFlagLabel(resident.sputum_suction)}</TableCell>
-                                    <TableCell className="text-right sticky right-0 bg-white z-10 shadow-sm">
+                                    <TableCell className="h-14">{getStatusLabel(resident.status)}</TableCell>
+                                    <TableCell className="text-gray-600 h-14">{resident.care_level || '-'}</TableCell>
+                                    <TableCell className="text-gray-600 h-14">{resident.start_date}</TableCell>
+                                    <TableCell className="text-gray-600 h-14">{resident.primary_insurance || '-'}</TableCell>
+                                    <TableCell className="text-gray-600 h-14">{resident.limit_application_class || '-'}</TableCell>
+                                    <TableCell className="text-gray-600 h-14">{resident.public_expense_1 || '-'}</TableCell>
+                                    <TableCell className="text-gray-600 h-14">{resident.public_expense_2 || '-'}</TableCell>
+                                    <TableCell className="text-center h-14">{getFlagLabel(resident.table_7)}</TableCell>
+                                    <TableCell className="text-center h-14">{getFlagLabel(resident.table_8)}</TableCell>
+                                    <TableCell className="text-center h-14">{getFlagLabel(resident.ventilator)}</TableCell>
+                                    <TableCell className="text-center h-14">{getFlagLabel(resident.severe_disability_addition)}</TableCell>
+                                    <TableCell className="text-center h-14">{getFlagLabel(resident.sputum_suction)}</TableCell>
+                                    <TableCell className="text-right sticky right-0 bg-white z-10 shadow-sm h-14">
                                         {(staff.role === 'admin' || staff.role === 'manager') && (
                                             <ResidentActions resident={resident} currentStaff={staff} />
                                         )}

@@ -28,6 +28,12 @@ export const sidebarItems: SidebarItem[] = [
         icon: LayoutDashboard,
     },
     {
+        title: '経営ダッシュボード',
+        href: '/hq/dashboard',
+        icon: BarChart3,
+        adminOnly: true,
+    },
+    {
         title: '業務日誌',
         href: '/daily-reports',
         icon: FileSpreadsheet,

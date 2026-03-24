@@ -42,3 +42,20 @@ next-env.d.ts
 
 # Sentry Config File
 .env.sentry-build-plugin
+
+# Logs and Reports
+*.txt
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!results.json
+playwright-report/
+test-results/
+.agent/
+__tests__/__mocks__/
+__tests__/unit/
+
+# IDE
+.vscode/
+.idea/

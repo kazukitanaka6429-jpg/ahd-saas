@@ -117,15 +117,15 @@ export function StaffShiftGrid({ staffs, initialData, date, facilityId }: StaffS
             )}
 
             <div className="flex items-start gap-4">
-                <div className="border border-black bg-white">
+                <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
                     {/* Day Shift */}
-                    <div className="grid grid-cols-[80px_1fr] border-b border-black">
-                        <div className="bg-green-100 flex items-center justify-center font-bold border-r border-black p-2 text-sm">
+                    <div className="grid grid-cols-[80px_1fr] border-b border-gray-200">
+                        <div className="bg-orange-50/50 flex items-center justify-center font-bold border-r border-gray-200 p-2 text-sm text-gray-700">
                             日勤
                         </div>
-                        <div className="grid grid-cols-8 divide-x divide-black w-[800px]">
+                        <div className="grid grid-cols-8 divide-x divide-gray-200 w-[800px]">
                             {[0, 1, 2, 3, 4, 5, 6, 7].map(i => (
-                                <div key={i} className="p-1">
+                                <div key={i} className="p-1 hover:bg-gray-50 transition-colors">
                                     <StaffSelect
                                         staffs={staffs}
                                         value={getStaffIdAt('day', i)}
@@ -138,12 +138,12 @@ export function StaffShiftGrid({ staffs, initialData, date, facilityId }: StaffS
 
                     {/* Night Shift */}
                     <div className="grid grid-cols-[80px_1fr]">
-                        <div className="bg-green-100 flex items-center justify-center font-bold border-r border-black p-2 text-sm">
+                        <div className="bg-orange-50/50 flex items-center justify-center font-bold border-r border-gray-200 p-2 text-sm text-gray-700">
                             夜勤
                         </div>
-                        <div className="grid grid-cols-8 divide-x divide-black w-[800px]">
+                        <div className="grid grid-cols-8 divide-x divide-gray-200 w-[800px]">
                             {[0, 1, 2, 3, 4, 5, 6, 7].map(i => (
-                                <div key={i} className="p-1">
+                                <div key={i} className="p-1 hover:bg-gray-50 transition-colors">
                                     <StaffSelect
                                         staffs={staffs}
                                         value={getStaffIdAt('night', i)}
@@ -156,18 +156,18 @@ export function StaffShiftGrid({ staffs, initialData, date, facilityId }: StaffS
                 </div>
 
                 {/* Controls Outside Frame */}
-                <div className="flex flex-col gap-2 pt-1">
-                    <div className="flex items-center gap-2 p-2 rounded border border-gray-200 bg-white">
+                <div className="flex flex-col gap-3 pt-1">
+                    <div className="flex items-center gap-2 p-3 rounded-xl border border-gray-200 bg-white shadow-sm hover:border-orange-200 transition-colors">
                         <Checkbox
                             id="night_plus"
                             checked={!!shiftData.night_shift_plus}
                             onCheckedChange={handleNightShiftPlus}
-                            className="w-5 h-5 accent-green-600"
+                            className="w-5 h-5 accent-orange-600"
                         />
-                        <label htmlFor="night_plus" className="text-sm font-bold cursor-pointer">夜勤加配</label>
+                        <label htmlFor="night_plus" className="text-sm font-bold cursor-pointer text-gray-700">夜勤加配</label>
                     </div>
 
-                    <Button onClick={onManualSave} disabled={isGlobalSaving} className="bg-green-600 hover:bg-green-700 text-white font-bold h-10 w-full">
+                    <Button onClick={onManualSave} disabled={isGlobalSaving} className="bg-orange-600 hover:bg-orange-700 text-white font-bold h-11 w-full rounded-xl shadow-sm transition-all">
                         {isGlobalSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                         保存
                     </Button>

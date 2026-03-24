@@ -8,6 +8,8 @@ import { logger } from '@/lib/logger'
 import { translateError } from '@/lib/error-translator'
 import { DOCUMENT_TYPE_LABELS, DocumentAlert, AlertLevel } from '@/lib/document-types'
 
+import { logOperation } from '@/lib/operation-logger'
+
 interface DocumentHistoryInput {
     id?: string
     residentId: string
@@ -42,13 +44,26 @@ export async function upsertDocumentHistory(data: DocumentHistoryInput) {
             notes: data.notes || null
         }
 
-        const { error } = await supabase
+        const { data: inserted, error } = await supabase
             .from('resident_document_history')
             .upsert(upsertData, { onConflict: 'id' })
+            .select()
+            .single()
 
         if (error) {
             logger.error('upsertDocumentHistory failed', error)
             return { error: translateError(error.message) }
+        }
+
+        if (inserted) {
+            logOperation({
+                organizationId: staff.organization_id,
+                actorId: staff.id,
+                targetResource: 'resident_document',
+                actionType: data.id ? 'UPDATE' : 'CREATE',
+                targetId: inserted.id,
+                details: { residentId: data.residentId, type: data.documentType }
+            })
         }
 
         revalidatePath('/residents')
@@ -203,7 +218,14 @@ export async function markAsRenewed(id: string) {
             return { error: translateError(error.message) }
         }
 
-        logger.warn('Document marked as renewed', { staffId: staff.id, documentId: id })
+        logOperation({
+            organizationId: staff.organization_id,
+            actorId: staff.id,
+            targetResource: 'resident_document',
+            actionType: 'UPDATE',
+            targetId: id,
+            details: { action: 'renewED' }
+        })
 
         revalidatePath('/')
         return { success: true }
@@ -235,7 +257,13 @@ export async function deleteDocumentHistory(id: string) {
             return { error: translateError(error.message) }
         }
 
-        logger.warn('Document history deleted', { staffId: staff.id, documentId: id })
+        logOperation({
+            organizationId: staff.organization_id,
+            actorId: staff.id,
+            targetResource: 'resident_document',
+            actionType: 'DELETE',
+            targetId: id
+        })
 
         revalidatePath('/residents')
         revalidatePath('/')

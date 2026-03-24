@@ -502,6 +502,236 @@ export interface Database {
                     updated_at?: string
                 }
             }
+            attendance_records: {
+                Row: {
+                    id: string
+                    facility_id: string
+                    staff_name: string
+                    work_date: string
+                    start_time: string
+                    end_time: string
+                    break_time_minutes: number
+                    created_at: string
+                    updated_at: string
+                }
+                Insert: {
+                    id?: string
+                    facility_id: string
+                    staff_name: string
+                    work_date: string
+                    start_time: string
+                    end_time: string
+                    break_time_minutes?: number
+                    created_at?: string
+                    updated_at?: string
+                }
+                Update: {
+                    id?: string
+                    facility_id?: string
+                    staff_name?: string
+                    work_date?: string
+                    start_time?: string
+                    end_time?: string
+                    break_time_minutes?: number
+                    created_at?: string
+                    updated_at?: string
+                }
+            }
+            spot_job_records: {
+                Row: {
+                    id: string
+                    facility_id: string
+                    job_apply_id: string | null
+                    job_id: string | null
+                    staff_name: string
+                    provider: string
+                    work_date: string
+                    start_time: string
+                    end_time: string
+                    created_at: string
+                    updated_at: string
+                }
+                Insert: {
+                    id?: string
+                    facility_id: string
+                    job_apply_id?: string | null
+                    job_id?: string | null
+                    staff_name: string
+                    provider: string
+                    work_date: string
+                    start_time: string
+                    end_time: string
+                    created_at?: string
+                    updated_at?: string
+                }
+                Update: {
+                    id?: string
+                    facility_id?: string
+                    job_apply_id?: string | null
+                    job_id?: string | null
+                    staff_name?: string
+                    provider?: string
+                    work_date?: string
+                    start_time?: string
+                    end_time?: string
+                    created_at?: string
+                    updated_at?: string
+                }
+            }
+            visiting_nursing_records: {
+                Row: {
+                    id: string
+                    facility_id: string
+                    resident_name: string | null
+                    visit_date: string
+                    start_time: string
+                    end_time: string
+                    nursing_staff_name: string
+                    secondary_nursing_staff_name_1: string | null
+                    secondary_nursing_staff_name_2: string | null
+                    secondary_nursing_staff_name_3: string | null
+                    service_type: string | null
+                    created_at: string
+                    updated_at: string
+                }
+                Insert: {
+                    id?: string
+                    facility_id: string
+                    resident_name?: string | null
+                    visit_date: string
+                    start_time: string
+                    end_time: string
+                    nursing_staff_name: string
+                    secondary_nursing_staff_name_1?: string | null
+                    secondary_nursing_staff_name_2?: string | null
+                    secondary_nursing_staff_name_3?: string | null
+                    service_type?: string | null
+                    created_at?: string
+                    updated_at?: string
+                }
+                Update: {
+                    id?: string
+                    facility_id?: string
+                    resident_name?: string | null
+                    visit_date?: string
+                    start_time?: string
+                    end_time?: string
+                    nursing_staff_name?: string
+                    secondary_nursing_staff_name_1?: string | null
+                    secondary_nursing_staff_name_2?: string | null
+                    secondary_nursing_staff_name_3?: string | null
+                    service_type?: string | null
+                    created_at?: string
+                    updated_at?: string
+                }
+            }
+            manual_work_records: {
+                Row: {
+                    id: string
+                    facility_id: string
+                    staff_id: string | null
+                    target_date: string
+                    start_time: string
+                    end_time: string
+                    is_night_shift: boolean
+                    note: string | null
+                    created_at: string
+                    updated_at: string
+                }
+                Insert: {
+                    id?: string
+                    facility_id: string
+                    staff_id?: string | null
+                    target_date: string
+                    start_time: string
+                    end_time: string
+                    is_night_shift?: boolean
+                    note?: string | null
+                    created_at?: string
+                    updated_at?: string
+                }
+                Update: {
+                    id?: string
+                    facility_id?: string
+                    staff_id?: string | null
+                    target_date?: string
+                    start_time?: string
+                    end_time?: string
+                    note?: string | null
+                    created_at?: string
+                    updated_at?: string
+                }
+            }
+            manual_deductions: {
+                Row: {
+                    id: string
+                    facility_id: string
+                    staff_id: string | null
+                    target_date: string
+                    start_time: string
+                    end_time: string
+                    reason: string | null
+                    created_at: string
+                    updated_at: string
+                }
+                Insert: {
+                    id?: string
+                    facility_id: string
+                    staff_id?: string | null
+                    target_date: string
+                    start_time: string
+                    end_time: string
+                    reason?: string | null
+                    created_at?: string
+                    updated_at?: string
+                }
+                Update: {
+                    id?: string
+                    facility_id?: string
+                    staff_id?: string | null
+                    target_date?: string
+                    start_time?: string
+                    end_time?: string
+                    reason?: string | null
+                    created_at?: string
+                    updated_at?: string
+                }
+            }
+            operation_logs: {
+                Row: {
+                    id: string
+                    organization_id: string
+                    actor_id: string
+                    target_resource: string
+                    target_id: string | null
+                    action_type: string
+                    details: Json | null
+                    ip_address: string | null
+                    created_at: string
+                }
+                Insert: {
+                    id?: string
+                    organization_id: string
+                    actor_id: string
+                    target_resource: string
+                    target_id?: string | null
+                    action_type: string
+                    details?: Json | null
+                    ip_address?: string | null
+                    created_at?: string
+                }
+                Update: {
+                    id?: string
+                    organization_id?: string
+                    actor_id?: string
+                    target_resource?: string
+                    target_id?: string | null
+                    action_type?: string
+                    details?: Json | null
+                    ip_address?: string | null
+                    created_at?: string
+                }
+            }
         }
         Views: {
             [_ in never]: never

@@ -117,18 +117,20 @@ export default async function MedicalCooperationPage({
     const facilityName = facilityData?.name || '施設未選択'
 
     return (
-        <div className="h-full flex flex-col space-y-4 pb-8">
-            <div className="flex items-center justify-between mb-2">
+        <div className="space-y-6 pt-6 pb-20 px-6 max-w-[100vw] overflow-hidden">
+            <div className="flex flex-col md:flex-row md:items-end justify-between border-b pb-4 gap-4">
                 <div>
-                    <h2 className="text-2xl font-bold tracking-tight">🏥 医療連携体制加算Ⅳ</h2>
-                    <p className="text-muted-foreground text-sm">
+                    <h1 className="text-2xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+                        🏥 医療連携体制加算Ⅳ
+                    </h1>
+                    <p className="text-sm text-gray-500 mt-1">
                         看護職員による夜間の訪問・対応記録
                     </p>
-                    <div className="mt-2">
+                    <div className="mt-2 text-left">
                         <span className="text-sm text-muted-foreground bg-gray-100 px-2 py-1 rounded">{facilityName}</span>
                     </div>
                 </div>
-                <div>
+                <div className="flex items-center gap-4">
                     <React.Suspense fallback={<div>Loading...</div>}>
                         <MonthSelector currentMonth={currentMonth} />
                     </React.Suspense>

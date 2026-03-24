@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/admin'
+
 import { AttendanceRecord, ManualWorkRecord, SpotJobRecord, VisitingNursingRecord, ManualDeduction } from '@/types/audit'
 import { DailyShift } from '@/types'
 import { addDays, format, subDays, parseISO, isBefore, isAfter, startOfDay, endOfDay } from 'date-fns'
@@ -44,8 +44,9 @@ const SHIFT_DAY_END = "17:30"
 const SHIFT_NIGHT_START = "16:30"
 const SHIFT_NIGHT_END = "09:30"
 
-export async function fetchAuditData(targetDate: string, facilityId: string): Promise<AuditData> {
-    const supabase = createAdminClient()
+import { SupabaseClient } from '@supabase/supabase-js'
+
+export async function fetchAuditData(targetDate: string, facilityId: string, supabase: SupabaseClient): Promise<AuditData> {
     const prevDate = format(subDays(parseISO(targetDate), 1), 'yyyy-MM-dd')
     const dates = [prevDate, targetDate]
 

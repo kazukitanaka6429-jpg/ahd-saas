@@ -55,7 +55,7 @@ const FindingCell = ({
     return (
         <TableCell
             className={cn(
-                "border border-black p-0 text-center align-middle h-[40px] relative bg-white",
+                "border border-gray-200 p-0 text-center align-middle h-[40px] relative bg-white",
                 className,
                 hasValidationError && "ring-2 ring-red-500 ring-inset bg-red-50"
             )}
@@ -330,8 +330,8 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
         return findingsIndicators[record.id]?.includes(key)
     }
 
-    const headerClass = "border border-black bg-gray-100 text-center font-bold text-xs p-1 h-auto align-middle"
-    const checkboxClass = "w-5 h-5 accent-green-600 cursor-pointer"
+    const headerClass = "border border-gray-200 bg-[#Fdfbf9] text-center font-bold text-xs p-1 h-auto align-middle text-gray-700"
+    const checkboxClass = "w-5 h-5 accent-orange-600 cursor-pointer"
 
     // Unit Filtering State
     const [selectedUnitId, setSelectedUnitId] = useState<string>(() => {
@@ -347,13 +347,13 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
     })
 
     return (
-        <div className="rounded-md border bg-white overflow-hidden shadow-sm">
-            <div className="px-4 py-2 border-b flex justify-between items-center bg-gray-50 border-black border-l-0 border-r-0 border-t-0">
-                <div className="text-sm font-bold flex items-center gap-2">
-                    <span className="w-2 h-2 bg-black mr-1"></span>
+        <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden shadow-sm">
+            <div className="px-4 py-3 border-b flex justify-between items-center bg-white">
+                <div className="text-base font-bold text-gray-800 flex items-center gap-2">
+                    <span className="w-1.5 h-4 bg-orange-500 rounded-full mr-1"></span>
                     日中・夜間支援（業務日誌）
                 </div>
-                <Button onClick={onManualSave} disabled={isGlobalSaving} className="h-8 bg-green-600 hover:bg-green-700 text-white font-bold">
+                <Button onClick={onManualSave} disabled={isGlobalSaving} className="h-9 px-5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold transition-all shadow-sm">
                     {isGlobalSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                     保存
                 </Button>
@@ -403,12 +403,12 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
             )}
 
             <div className="overflow-x-auto">
-                <Table className="min-w-[1000px] border-collapse border border-black text-sm w-full">
+                <Table className="min-w-[1000px] border-collapse border border-gray-200 text-sm w-full">
                     <TableHeader>
                         <TableRow className="h-[40px]">
                             <TableHead className={cn(headerClass, "w-[150px]")} rowSpan={2}>ご利用者名</TableHead>
                             <TableHead className={cn(headerClass)} colSpan={3}>
-                                <div className="border-b border-black py-1">食事</div>
+                                <div className="border-b border-gray-200 py-1">食事</div>
                                 <div className="text-red-500 text-xs">バランス弁当提供</div>
                             </TableHead>
                             <TableHead className={cn(headerClass)} colSpan={3}>
@@ -419,16 +419,16 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
                             </TableHead>
                         </TableRow>
                         <TableRow className="h-[30px]">
-                            <TableHead className={cn(headerClass, "w-[60px] bg-green-100/50")}>朝食</TableHead>
-                            <TableHead className={cn(headerClass, "w-[60px] bg-green-100/50")}>昼食</TableHead>
-                            <TableHead className={cn(headerClass, "w-[60px] bg-green-100/50")}>夕食</TableHead>
-                            <TableHead className={cn(headerClass, "w-[60px] bg-green-100/50")}>GH</TableHead>
-                            <TableHead className={cn(headerClass, "w-[60px] bg-green-100/50")}>日中活動</TableHead>
-                            <TableHead className={cn(headerClass, "w-[200px] bg-green-100/50")}>その他福祉サービス利用</TableHead>
-                            <TableHead className={cn(headerClass, "w-[60px] bg-green-100/50")}>GH泊</TableHead>
-                            <TableHead className={cn(headerClass, "w-[60px] bg-green-100/50")}>救急搬送</TableHead>
-                            <TableHead className={cn(headerClass, "w-[60px] bg-green-100/50")}>入院</TableHead>
-                            <TableHead className={cn(headerClass, "w-[60px] bg-green-100/50")}>外泊</TableHead>
+                            <TableHead className={cn(headerClass, "w-[60px]")}>朝食</TableHead>
+                            <TableHead className={cn(headerClass, "w-[60px]")}>昼食</TableHead>
+                            <TableHead className={cn(headerClass, "w-[60px]")}>夕食</TableHead>
+                            <TableHead className={cn(headerClass, "w-[60px]")}>GH</TableHead>
+                            <TableHead className={cn(headerClass, "w-[60px]")}>日中活動</TableHead>
+                            <TableHead className={cn(headerClass, "w-[200px]")}>その他福祉サービス利用</TableHead>
+                            <TableHead className={cn(headerClass, "w-[60px]")}>GH泊</TableHead>
+                            <TableHead className={cn(headerClass, "w-[60px]")}>救急搬送</TableHead>
+                            <TableHead className={cn(headerClass, "w-[60px]")}>入院</TableHead>
+                            <TableHead className={cn(headerClass, "w-[60px]")}>外泊</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -439,8 +439,8 @@ export function DailyReportGrid({ residents, defaultRecords, date, findingsIndic
                             const unitName = units.find(u => u.id === resident.unit_id)?.name
 
                             return (
-                                <TableRow key={resident.id} className="divide-x divide-black border-b border-black">
-                                    <TableCell className="p-2 border border-black font-bold text-center bg-white">
+                                <TableRow key={resident.id} className="divide-x divide-gray-200 border-b border-gray-200 hover:bg-gray-50/50 transition-colors">
+                                    <TableCell className="p-2 border border-gray-200 font-bold text-center bg-white text-gray-800">
                                         <div className="flex flex-col items-center justify-center gap-1">
                                             <span>{resident.name}</span>
                                             {selectedUnitId === 'all' && unitName && (

@@ -80,15 +80,17 @@ export default async function StaffsPage() {
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
+        <div className="space-y-6 pt-6 pb-20 px-6 max-w-[100vw] overflow-hidden">
+            <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-gray-200 pb-4 gap-4">
                 <div>
-                    <h2 className="text-2xl font-bold tracking-tight">職員マスタ</h2>
-                    <p className="text-muted-foreground">
+                    <h2 className="text-2xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+                        👥 職員マスタ
+                    </h2>
+                    <p className="text-sm text-gray-500 mt-1">
                         {staffs?.length || 0}名の職員が登録されています
                     </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                     {/* Only Admin allows import presumably, or managers? User said Staff Master is for Admin usually. 
                         Let's allow it for whoever sees this page, but action checks permissions. 
                         Actually only Admin should see Import maybe? 
@@ -100,28 +102,28 @@ export default async function StaffsPage() {
                 </div>
             </div>
 
-            <div className="rounded-md border bg-white overflow-hidden">
+            <div className="border border-gray-200 rounded-2xl bg-white shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                     <Table className="whitespace-nowrap">
-                        <TableHeader>
-                            <TableRow className="bg-gray-50/50">
-                                <TableHead className="min-w-[150px]">氏名</TableHead>
-                                <TableHead>施設</TableHead>
-                                <TableHead>システム権限</TableHead>
-                                <TableHead>ステータス</TableHead>
-                                <TableHead>職種</TableHead>
-                                <TableHead>資格</TableHead>
-                                <TableHead>入社日</TableHead>
-                                <TableHead>退社日</TableHead>
-                                <TableHead>登録日</TableHead>
-                                <TableHead>アカウント</TableHead>
-                                <TableHead className="text-right sticky right-0 bg-white shadow-sm">操作</TableHead>
+                        <TableHeader className="bg-[#Fdfbf9]">
+                            <TableRow className="hover:bg-transparent">
+                                <TableHead className="min-w-[150px] font-bold text-gray-700 h-12">氏名</TableHead>
+                                <TableHead className="font-bold text-gray-700 h-12">施設</TableHead>
+                                <TableHead className="font-bold text-gray-700 h-12">システム権限</TableHead>
+                                <TableHead className="font-bold text-gray-700 h-12">ステータス</TableHead>
+                                <TableHead className="font-bold text-gray-700 h-12">職種</TableHead>
+                                <TableHead className="font-bold text-gray-700 h-12">資格</TableHead>
+                                <TableHead className="font-bold text-gray-700 h-12">入社日</TableHead>
+                                <TableHead className="font-bold text-gray-700 h-12">退社日</TableHead>
+                                <TableHead className="font-bold text-gray-700 h-12">登録日</TableHead>
+                                <TableHead className="font-bold text-gray-700 h-12">アカウント</TableHead>
+                                <TableHead className="text-right sticky right-0 bg-[#Fdfbf9] shadow-sm font-bold text-gray-700 h-12">操作</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {staffs?.map((s: any) => (
-                                <TableRow key={s.id}>
-                                    <TableCell className="font-medium sticky left-0 bg-white z-10">{s.name}</TableCell>
+                                <TableRow key={s.id} className="hover:bg-gray-50/50 transition-colors">
+                                    <TableCell className="font-medium sticky left-0 bg-white z-10 text-gray-800 h-14">{s.name}</TableCell>
                                     <TableCell>
                                         {!s.facility_id ? (
                                             <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-200">本社</Badge>
@@ -136,30 +138,32 @@ export default async function StaffsPage() {
                                             <Badge key={job} variant="outline" className="mr-1">{job}</Badge>
                                         ))}
                                     </TableCell>
-                                    <TableCell>
-                                        {s.qualifications ? (
-                                            <span className="font-medium">{(s as StaffWithRelations).qualifications?.name}</span>
-                                        ) : (
-                                            <span className="text-gray-400">-</span>
-                                        )}
-                                        {s.qualifications_text && (
-                                            <span className="text-xs text-gray-500 ml-1">({s.qualifications_text})</span>
-                                        )}
+                                    <TableCell className="h-14">
+                                        <div className="flex flex-col gap-1 items-start">
+                                            {s.qualifications ? (
+                                                <span className="font-medium">{(s as StaffWithRelations).qualifications?.name}</span>
+                                            ) : (
+                                                <span className="text-gray-400">-</span>
+                                            )}
+                                            {s.qualifications_text && (
+                                                <span className="text-[10px] text-gray-500">({s.qualifications_text})</span>
+                                            )}
+                                        </div>
                                     </TableCell>
-                                    <TableCell>{s.join_date || '-'}</TableCell>
-                                    <TableCell>{s.leave_date || '-'}</TableCell>
-                                    <TableCell>
+                                    <TableCell className="text-gray-600 h-14">{s.join_date || '-'}</TableCell>
+                                    <TableCell className="text-gray-600 h-14">{s.leave_date || '-'}</TableCell>
+                                    <TableCell className="text-gray-600 h-14">
                                         {new Date(s.created_at).toLocaleDateString('ja-JP')}
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className="h-14">
                                         {s.auth_user_id ? (
-                                            <Badge variant="secondary" className="gap-1 bg-green-100 text-green-700">
+                                            <Badge variant="secondary" className="gap-1 bg-green-100 text-green-800 border-green-200">
                                                 <CheckCircle className="h-3 w-3" />
                                                 登録済み
                                             </Badge>
                                         ) : s.invite_token ? (
                                             <div className="flex items-center gap-2">
-                                                <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">
+                                                <Badge variant="outline" className="text-orange-700 border-orange-200 bg-orange-50">
                                                     招待済み
                                                 </Badge>
                                                 <InviteLinkButton
@@ -174,7 +178,7 @@ export default async function StaffsPage() {
                                             />
                                         )}
                                     </TableCell>
-                                    <TableCell className="text-right sticky right-0 bg-white z-10 shadow-sm">
+                                    <TableCell className="text-right sticky right-0 bg-white z-10 shadow-sm h-14">
                                         <StaffActions staff={s} currentStaff={staff} />
                                     </TableCell>
                                 </TableRow>

@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
+import dotenv from 'dotenv';
 
+dotenv.config({ path: '.env.local' });
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
@@ -14,7 +16,7 @@ export default defineConfig({
     /* Opt out of parallel tests on CI. */
     workers: process.env.CI ? 1 : undefined,
     /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-    reporter: 'list',
+    reporter: [['list'], ['html', { open: 'never' }], ['json', { outputFile: 'results.json' }]],
     /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
     use: {
         /* Base URL to use in actions like `await page.goto('/')`. */
@@ -27,8 +29,16 @@ export default defineConfig({
     /* Configure projects for major browsers */
     projects: [
         {
+            name: 'setup',
+            testMatch: /.*\.setup\.ts/,
+        },
+        {
             name: 'chromium',
-            use: { ...devices['Desktop Chrome'] },
+            use: { 
+                ...devices['Desktop Chrome'],
+                storageState: 'playwright/.auth/user.json',
+            },
+            dependencies: ['setup'],
         },
         // {
         //   name: 'firefox',
@@ -45,5 +55,6 @@ export default defineConfig({
         command: 'npm run dev',
         url: 'http://localhost:3000',
         reuseExistingServer: !process.env.CI,
+        timeout: 120 * 1000,
     },
 });

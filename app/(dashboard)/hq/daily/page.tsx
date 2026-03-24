@@ -115,26 +115,26 @@ export default async function HqDailyPage({ searchParams }: { searchParams: Prom
     const nextLink = `/hq/daily?year=${nextDate.getFullYear()}&month=${nextDate.getMonth() + 1}`
 
     return (
-        <div className="flex flex-col h-full gap-4 p-4">
-            <div className="flex justify-between items-center">
+        <div className="space-y-6 pt-6 pb-20 px-6 max-w-[100vw] overflow-hidden">
+            <div className="flex flex-col md:flex-row md:items-end justify-between border-b pb-4 gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold flex items-center gap-2">
+                    <h1 className="text-2xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
                         📒 一覧確認
                     </h1>
                 </div>
 
-                <div className="flex items-center gap-4 bg-white p-2 rounded border">
+                <div className="flex items-center gap-4 bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
                     <Link href={prevLink}>
-                        <Button variant="ghost" size="icon">
-                            <ChevronLeft className="w-4 h-4" />
+                        <Button variant="ghost" size="icon" className="text-gray-500 hover:bg-gray-100 hover:text-gray-900 rounded-lg">
+                            <ChevronLeft className="w-5 h-5" />
                         </Button>
                     </Link>
-                    <span className="font-bold text-lg min-w-[100px] text-center">
+                    <span className="font-bold text-lg min-w-[100px] text-center text-gray-800">
                         {year}年 {month}月
                     </span>
                     <Link href={nextLink}>
-                        <Button variant="ghost" size="icon">
-                            <ChevronRight className="w-4 h-4" />
+                        <Button variant="ghost" size="icon" className="text-gray-500 hover:bg-gray-100 hover:text-gray-900 rounded-lg">
+                            <ChevronRight className="w-5 h-5" />
                         </Button>
                     </Link>
                 </div>

@@ -19,11 +19,13 @@ export default async function QualificationsPage() {
     const qualifications = qualificationsData || []
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
+        <div className="space-y-6 pt-6 pb-20 px-6 max-w-[100vw] overflow-hidden">
+            <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-gray-200 pb-4 gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">資格マスタ管理</h1>
-                    <p className="text-muted-foreground">
+                    <h1 className="text-2xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+                        🎓 資格マスタ管理
+                    </h1>
+                    <p className="text-sm text-gray-500 mt-1">
                         スタッフの資格情報を管理します。医療連携加算の計算に使用されます。
                     </p>
                 </div>
